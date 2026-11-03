@@ -56,4 +56,3 @@ def generate(base: Recommendations, gaps: list[Gap]) -> Recommendations:
         action.resource = HARD[action.skill][2] if action.skill in HARD else "Retours d'un mentor"
     result.source = "llm"
     return result
-

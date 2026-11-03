@@ -157,4 +157,3 @@ def test_exports_escape_untrusted_content(request_data):
     assert "&lt;script&gt;" in report
     result["gaps"][0]["evidence"] = '=HYPERLINK("evil")'
     assert "'=HYPERLINK" in gap_csv(result)
-

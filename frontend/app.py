@@ -198,4 +198,3 @@ else:
         with col, st.container(border=True):
             st.markdown("#### " + title)
             st.write(body)
-

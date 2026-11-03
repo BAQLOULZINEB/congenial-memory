@@ -123,4 +123,3 @@ Les durées de chaque analyse sont affichées. Ce n'est pas une garantie sur tou
 - [spaCy : EntityRuler](https://spacy.io/api/entityruler)
 - [Sentence-Transformers : encode et normalisation](https://www.sbert.net/docs/package_reference/sentence_transformer/model.html)
 - [Streamlit : import de fichiers](https://docs.streamlit.io/develop/api-reference/widgets/st.file_uploader)
-

@@ -7,4 +7,3 @@ Docker et AWS sont requis pour le déploiement.
 FastAPI est un atout.
 Compétences
 Communication, travail en équipe et autonomie.
-

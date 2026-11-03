@@ -13,4 +13,3 @@ def test_dashboard_demo_and_method_render():
     app.sidebar.radio[0].set_value("Comprendre la méthode").run()
     assert not app.exception
     assert "Un score" in app.title[0].value
-

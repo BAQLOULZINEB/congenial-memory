@@ -90,4 +90,3 @@ def analyze(request: AnalysisRequest, embedder=None) -> AnalysisResult:
                                       "recommendations": round((finished-scored)*1000, 1),
                                       "total": round((finished-started)*1000, 1)},
                           embedding_model=settings().embedding_model)
-

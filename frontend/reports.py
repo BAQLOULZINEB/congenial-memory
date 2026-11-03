@@ -40,4 +40,3 @@ li{{margin:12px 0}}.score{{font-size:48px;font-weight:700}}@media print{{body{{m
 <p>Modèle : {esc(result['embedding_model'])} · Conseils : {esc(result['recommendations']['source'])}
 · Durée : {result['timings_ms']['total']:.0f} ms</p>
 <p>Rapport confidentiel. Utilisez la fonction Imprimer de votre navigateur pour l'enregistrer en PDF.</p></body></html>"""
-

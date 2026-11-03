@@ -58,4 +58,3 @@ def extract_document(filename: str, data: bytes) -> str:
     if len(text) > settings().max_text_chars:
         raise DocumentError("Le texte extrait dépasse la limite de 30 000 caractères.")
     return text
-

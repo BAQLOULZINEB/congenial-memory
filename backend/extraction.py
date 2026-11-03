@@ -83,4 +83,3 @@ def extract(text: str, is_job: bool = False) -> Profile:
     return Profile(sections=segment(text), skills=list(skills.values()),
                    experience_years=max(years) if years else None,
                    education_level=max(levels) if levels else None, degrees=list(dict.fromkeys(degrees)))
-

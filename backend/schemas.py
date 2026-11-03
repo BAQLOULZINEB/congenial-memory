@@ -89,4 +89,3 @@ class AnalysisResult(StrictModel):
     warnings: list[str]
     timings_ms: dict[str, float]
     embedding_model: str
-

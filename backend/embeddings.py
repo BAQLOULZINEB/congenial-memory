@@ -25,4 +25,3 @@ class Embedder:
 @lru_cache
 def get_embedder() -> Embedder:
     return Embedder()
-

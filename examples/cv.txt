@@ -1,0 +1,14 @@
+Profil
+Ingénieure data junior, 2 ans d'expérience professionnelle en analyse de données.
+Compétences techniques
+Python, SQL, Pandas, scikit-learn, Git, FastAPI.
+Expériences professionnelles
+Développement d'une API FastAPI pour servir un modèle de classification.
+Analyse de données avec Python et Pandas et automatisation de rapports SQL.
+Projets
+Construction d'un modèle scikit-learn, validation croisée et suivi de la précision.
+Formation
+Diplôme d'ingénieur en informatique, spécialité data science.
+Compétences
+Travail en équipe, communication et rigueur.
+

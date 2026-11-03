@@ -1,0 +1,10 @@
+Data Scientist — équipe produit
+Nous recherchons un profil avec 3 ans d'expérience professionnelle et un Master en informatique.
+Compétences techniques
+Python et SQL sont obligatoires.
+Maîtrise du Machine Learning et de scikit-learn.
+Docker et AWS sont requis pour le déploiement.
+FastAPI est un atout.
+Compétences
+Communication, travail en équipe et autonomie.
+

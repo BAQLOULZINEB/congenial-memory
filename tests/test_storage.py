@@ -14,8 +14,14 @@ from backend.schemas import AnalysisRequest
 @pytest.fixture
 def store_client(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "database_path", lambda: tmp_path / "reports.sqlite3")
+    monkeypatch.setattr("backend.auth.database_path", lambda: tmp_path / "reports.sqlite3")
     storage.initialize()
-    return TestClient(app)
+    client = TestClient(app)
+    account = {"nom": "Test", "email": "test@example.test", "mot_de_passe": "Local-test-123"}
+    assert client.post("/api/auth/inscription", json=account).status_code == 201
+    token = client.post("/api/auth/connexion", json=account).json()["access_token"]
+    client.headers["Authorization"] = f"Bearer {token}"
+    return client
 
 
 @pytest.fixture

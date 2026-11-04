@@ -129,7 +129,7 @@ describe("Explicit report persistence", () => {
       </MemoryRouter>,
     );
     expect(
-      screen.getByRole("heading", { name: "04 · La mémoire du prototype" }),
+      screen.getByRole("button", { name: /Historique local/ }),
     ).toBeInTheDocument();
     expect(screen.getByText("SQLite · stockage local")).toBeInTheDocument();
     expect(

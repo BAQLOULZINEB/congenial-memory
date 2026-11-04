@@ -1,3 +1,4 @@
+import { authFetch } from "./auth/api";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -13,7 +14,7 @@ import { Link } from "react-router-dom";
 import "./history.css";
 
 async function requestJSON(url, options = {}) {
-  const response = await fetch(url, options);
+  const response = await authFetch(url, options);
   if (response.status === 204) return null;
   let body;
   try {

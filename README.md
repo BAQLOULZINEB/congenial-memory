@@ -160,7 +160,7 @@ les exigences alternatives et les formulations ambiguës nécessitent une relect
 MiniLM all-MiniLM-L6-v2 est principalement anglophone ; les alias bilingues facilitent le français,
 mais une évaluation sur corpus annoté français reste nécessaire. Les seuils ne sont pas calibrés scientifiquement.
 Les suggestions LLM doivent être relues et ne doivent jamais servir à inventer des acquis.
-Ce projet local ne fournit pas authentification, multi-utilisateur, stockage ou déploiement public sécurisé.
+Le prototype fournit des comptes locaux et un historique isolé par utilisateur. Il ne constitue pas un déploiement public sécurisé.
 
 La cible de 5 secondes concerne le pipeline à chaud, hors téléchargement du modèle et génération LLM.
 Les durées de chaque analyse sont affichées. Ce n'est pas une garantie sur tout matériel ou document.
@@ -172,3 +172,9 @@ Les durées de chaque analyse sont affichées. Ce n'est pas une garantie sur tou
 - [Sentence-Transformers : encode et normalisation](https://www.sbert.net/docs/package_reference/sentence_transformer/model.html)
 - [React : interface utilisateur](https://react.dev/learn)
 - [Vite : compilation et développement](https://vite.dev/guide/)
+
+## Comptes et réutilisation du projet de référence
+
+Les pages Connexion et Inscription, leurs champs accessibles (affichage du mot de passe, erreurs), le contexte React et le module bcrypt/JWT ont été copiés depuis `prediction-prix-immobilier`, puis adaptés. Voir `docs/auth-reuse.md`.
+
+Au premier lancement, créez votre propre compte sur `/inscription`. Les mots de passe sont hachés avec bcrypt. Les jetons expirent après 60 minutes. Les bilans sont filtrés par utilisateur sur le serveur. Les anciens bilans sans propriétaire restent conservés en base mais ne sont attribués automatiquement à aucun compte.

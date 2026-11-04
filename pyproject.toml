@@ -4,10 +4,19 @@ version = "0.1.0"
 description = "Analyseur intelligent de CV et d'offres d'emploi — EMSI 5AISDR G8"
 requires-python = ">=3.11,<3.14"
 dependencies = [
-  "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "python-multipart>=0.0.20,<1",
-  "pydantic-settings>=2.7,<3", "httpx>=0.28,<1",
-  "pymupdf>=1.25,<2", "python-docx>=1.1,<2", "spacy>=3.8,<4",
-  "sentence-transformers>=3.4,<6", "transformers>=4.48,<5", "numpy>=1.26,<3"
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "python-multipart>=0.0.20,<1",
+  "pydantic-settings>=2.7,<3",
+  "httpx>=0.28,<1",
+  "pymupdf>=1.25,<2",
+  "python-docx>=1.1,<2",
+  "spacy>=3.8,<4",
+  "sentence-transformers>=3.4,<6",
+  "transformers>=4.48,<5",
+  "numpy>=1.26,<3",
+  "bcrypt>=5.0.0",
+  "pyjwt>=2.15.1",
 ]
 
 [dependency-groups]

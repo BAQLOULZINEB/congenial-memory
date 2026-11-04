@@ -106,7 +106,7 @@ L'API propose aussi `POST /api/analyze` pour les clients qui envoient directemen
 
 ## Base de données du prototype
 
-SQLite est intégrée à Python : aucun compte, serveur distant ni mot de passe n'est nécessaire.
+SQLite est intégrée à Python : aucun serveur de base distant n’est nécessaire. Les comptes de l’application sont stockés dans utilisateurs.
 Le fichier `data/talentmatch.sqlite3` est créé au démarrage, avec une table `analyses` :
 `id`, `title`, `created_at`, `score`, `is_demo` et `payload` (résultat JSON complet).
 Les colonnes de résumé alimentent l'historique ; le JSON permet de rouvrir les preuves, le plan et les exports.
@@ -122,7 +122,7 @@ Les requêtes SQL utilisent des paramètres et des transactions. Les fichiers de
 `DATABASE_PATH` permet de choisir l'emplacement. Un chemin relatif est résolu depuis la racine du projet.
 Les bilans enregistrés survivent au redémarrage du serveur et du navigateur. Les PDF/DOCX originaux
 ne sont pas stockés dans la table, mais le JSON contient des extraits personnels : l'enregistrement est explicite.
-La base n'est pas chiffrée par l'application. Pour une mise en ligne, il faudra ajouter authentification,
+La base n'est pas chiffrée par l'application. Pour une mise en ligne, il faudra renforcer la protection des sessions,
 séparation des utilisateurs, sauvegardes et règles de conservation avant toute exposition publique.
 
 ## Comment le résultat est construit
@@ -195,5 +195,11 @@ les alias bilingues aident le français sans constituer une validation statistiq
 
 La cible de cinq secondes porte sur le pipeline à chaud, hors chargement initial et génération LLM.
 La validation du JSON généré contrôle sa structure et certaines références, pas la véracité de toutes ses phrases.
-Les conseils doivent être relus. Cette version locale ne comprend pas d'authentification,
-de gestion multi-utilisateur ni d'infrastructure de déploiement public.
+Les conseils doivent être relus. Cette version locale comprend des comptes ; elle ne comprend pas de récupération de mot de passe ni d’infrastructure de déploiement public.
+
+
+## Authentification et diagrammes interactifs
+
+La page Architecture propose trois vues : système (React ↔ FastAPI, moteur NLP, branche SQLite), pipeline NLP et données/API. Chaque composant peut être sélectionné au clavier ou à la souris pour afficher son rôle.
+
+L’authentification réutilise le projet immobilier : bcrypt, JWT HS256 (60 minutes), utilisateurs en SQLite. La relation utilisateurs.id → analyses.utilisateur_id isole les bilans. Les routes d’historique vérifient le jeton et le propriétaire à chaque requête. Les comptes et la migration sont détaillés dans [auth-reuse.md](auth-reuse.md).

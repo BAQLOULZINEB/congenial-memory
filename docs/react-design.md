@@ -53,3 +53,11 @@ Aucun stockage persistant de candidatures ajouté. L'enrichissement LLM reste op
 ## Ajustement final de la fenêtre
 
 Toutes les routes partagent désormais un cadre de bureau limité à la hauteur du viewport et une navigation fixe. À 1280 × 720, la vue d'ensemble et le formulaire d'import sont visibles sans défilement. Les pages longues gardent un défilement interne accessible au clavier. Sous 1021 px ou sur une fenêtre très basse, le document reprend un défilement naturel pour préserver la lisibilité. Les couleurs violet, citron, orange et cyan, les panneaux sombres et les transitions restent cohérents entre les pages.
+
+## Revue UI / UX et composants réutilisés
+
+Les compétences ui-ux-pro-max, design et ui-styling ont guidé la hiérarchie, les états clavier, les tokens et les surfaces. Le résultat de recherche généraliste « vibrant bento » proposait une page marketing hors contexte ; il a été écarté. La recherche ciblée « data dashboard » correspondait au produit : densité contrôlée, panneaux comparables et détails à la demande. La palette de référence fournie par l’utilisateur reste prioritaire.
+
+Architecture : trois vues interactives avec flèches de flux, branche SQLite sous FastAPI et détails sélectionnables. Paramètres : presets, somme explicite et barres de répartition. Résultats : jauge radiale et quatre barres de score, uniquement basées sur le résultat réel. Les animations respectent prefers-reduced-motion.
+
+L’authentification reprend les composants et le flux du projet immobilier, adaptés à la palette sombre et au contexte CV/offres. La marque utilise un monogramme TM vectoriel au lieu d’un pictogramme générique d’IA.

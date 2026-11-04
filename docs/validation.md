@@ -18,6 +18,19 @@ Vérification locale : 4 novembre 2026.
 
 React remplace Streamlit à la demande de l'utilisateur. SQLite ajoute un historique explicite au cahier des charges initial. Les analyses non enregistrées restent transitoires. Les originaux PDF/DOCX ne sont pas sauvegardés dans la base ; les bilans contiennent des extraits et ne sont pas chiffrés.
 
-Le modèle MiniLM réel a été exécuté. Le service LLM optionnel n'est pas installé dans cet environnement : son repli local et ses contrats sont testés, mais aucune génération avec un véritable serveur LLM n'est revendiquée. Le prototype est destiné à une utilisation locale, sans comptes utilisateurs ni déploiement public. Les PDF scannés nécessitent un OCR non inclus.
+Le modèle MiniLM réel a été exécuté. Le service LLM optionnel n'est pas installé dans cet environnement : son repli local et ses contrats sont testés, mais aucune génération avec un véritable serveur LLM n'est revendiquée. Le prototype est destiné à une utilisation locale, avec comptes locaux, sans déploiement public. Les PDF scannés nécessitent un OCR non inclus.
 
 Le fichier personnel non suivi `build_cv_project.py` reste hors du périmètre de cette migration ; ses avertissements de lint préexistants n'ont pas été modifiés.
+
+## Revue finale : comptes, diagrammes et graphiques
+
+- Authentification réutilisée depuis le projet immobilier (détail dans auth-reuse.md) : inscription, connexion, persistance de session, déconnexion, bcrypt et JWT.
+- 37 tests backend réussis, dont isolation de deux comptes, mot de passe erroné, doublon email, session expirée, limite bcrypt UTF-8 et conservation des anciens bilans. Les six tests auth/stockage ont été rejoués après la dernière modification backend.
+- 17 tests React réussis, dont sélection des diagrammes, presets de pondération, total invalide et valeur accessible de la jauge.
+- Parcours navigateur : création d’un compte synthétique, analyse réelle à 67,7, sauvegarde du bilan et historique retrouvé après redémarrage du serveur.
+- Les trois diagrammes Système, Pipeline NLP et Données/API fonctionnent. La vue système complète tient dans 1280 × 720 ; les détails changent à la sélection d’un composant.
+- Settings et architecture à 375 px : aucune largeur de document supérieure à la largeur disponible.
+- Jauge et barres utilisent les scores calculés. Aucun score fictif n’est affiché avant une analyse ; un critère non exigé reste sans barre.
+- Logo monogramme SVG, favicon assortie, titres plus directs, texte courant de 13–14 px dans les panneaux compacts et surfaces vitrées cohérentes.
+- Le lancement final conserve les données existantes. Les anciens rapports sans propriétaire ne deviennent pas accessibles aux nouveaux comptes.
+- Connexion et déconnexion explicites vérifiées dans le navigateur après inscription. Session reconnue après redémarrage serveur. La page de connexion à 375 px n’a aucun débordement horizontal.

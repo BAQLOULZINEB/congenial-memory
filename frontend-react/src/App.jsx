@@ -23,7 +23,6 @@ import {
   ChevronRight,
   CircleHelp,
   Code2,
-  Database,
   FileText,
   FolderClock,
   GraduationCap,
@@ -45,6 +44,11 @@ import {
 import { criteria, defaultWeights, demoCV, demoJob } from "./demo";
 import { analyzeDocuments, validateInputs } from "./api";
 import { downloadReport } from "./exports";
+import ScoreGauge from "./ScoreGauge";
+import Brand from "./Brand";
+import { useAuth } from "./auth/context/AuthContext";
+import Settings from "./Settings";
+import Architecture from "./Architecture";
 import SavedAnalyses, { SaveAnalysis } from "./SavedAnalyses";
 
 const emptyDoc = () => ({ mode: "file", file: null, text: "" });
@@ -65,6 +69,7 @@ const number = (n) =>
   new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(n);
 
 export default function App() {
+  const { utilisateur, deconnexion } = useAuth();
   const [cv, setCV] = useState(emptyDoc);
   const [job, setJob] = useState(emptyDoc);
   const [weights, setWeights] = useState({ ...defaultWeights });
@@ -261,19 +266,13 @@ export default function App() {
         className={`sidebar ${mobile ? "open" : ""}`}
       >
         <NavLink to="/" className="brand" onClick={() => setMobile(false)}>
-          <span className="brand-icon">
-            <Sparkles size={23} />
-          </span>
-          <span>
-            talent<span className="brand-light">match</span>
-            <span className="brand-dot">.</span>
-          </span>
+          <Brand />
         </NavLink>
         <div className="workspace">
           <span className="workspace-avatar">TM</span>
           <div>
-            <strong>Mon espace carrière</strong>
-            <small>Votre prochaine étape commence ici</small>
+            <strong>{utilisateur?.nom || "Mon espace carrière"}</strong>
+            <small>Analyses de candidatures</small>
           </div>
         </div>
         <p className="nav-caption">ESPACE DE TRAVAIL</p>
@@ -370,9 +369,9 @@ export default function App() {
                     ? "Modèle en chargement"
                     : "Moteur hors ligne"}
             </span>
-            <span className="profile-badge" aria-label="Espace personnel">
-              TM
-            </span>
+            <button className="logout-button" onClick={deconnexion}>
+              Se déconnecter
+            </button>
           </div>
         </header>
         <main id="main" ref={mainRef} tabIndex={-1}>
@@ -570,14 +569,14 @@ function Overview({ result, loadDemo, navigate }) {
         eyebrow="VOTRE ESPACE CARRIÈRE"
         title={
           <>
-            Votre prochain chapitre<span className="accent-dot">.</span>
+            Votre espace candidature<span className="accent-dot">.</span>
           </>
         }
         text="Comprendre votre profil. Préparer la suite."
         action={
           <span className="overview-date">
             <Sparkles size={15} />
-            Le potentiel se cultive.
+            CV · offre · bilan
           </span>
         }
       />
@@ -668,13 +667,7 @@ function Overview({ result, loadDemo, navigate }) {
             <span>VOTRE ADÉQUATION</span>
             <Target size={22} />
           </div>
-          <div className="compact-score-number">
-            {result ? number(result.score) : "—"}
-            <small>{result ? "/100" : "à découvrir"}</small>
-          </div>
-          <div className="compact-score-track">
-            <span style={{ width: `${result?.score ?? 0}%` }} />
-          </div>
+          <ScoreGauge score={result?.score} compact />
           <h2>
             {result
               ? "Votre dernier bilan."
@@ -737,9 +730,9 @@ function Overview({ result, loadDemo, navigate }) {
             <Code2 size={22} />
           </div>
           <h2>
-            Des résultats.
+            Les étapes
             <br />
-            Pas une boîte noire.
+            de votre analyse.
           </h2>
           <p>
             Découvrez comment React, FastAPI et les modèles NLP travaillent
@@ -781,186 +774,6 @@ function AnimatedPage({ children }) {
     >
       {children}
     </motion.div>
-  );
-}
-
-function Architecture() {
-  const layers = [
-    {
-      color: "purple",
-      icon: LayoutDashboard,
-      name: "01 · L’interface",
-      stack: "React · JavaScript · Vite",
-      text: "Les composants affichent vos documents, vos réglages et vos résultats. React Router pilote les pages, Tailwind organise le style et Framer Motion anime les transitions.",
-      detail:
-        "Responsabilité : interactions, validation côté navigateur et exports.",
-    },
-    {
-      color: "orange",
-      icon: Code2,
-      name: "02 · Le contrat API",
-      stack: "FastAPI · Pydantic",
-      text: "Le navigateur envoie les documents par HTTP. FastAPI vérifie les entrées et délègue le traitement au pipeline. Pydantic valide les structures échangées.",
-      detail: "Responsabilité : recevoir, valider et orchestrer.",
-    },
-    {
-      color: "lime",
-      icon: Sparkles,
-      name: "03 · Le moteur d’analyse",
-      stack: "spaCy · Sentence-Transformers",
-      text: "Le texte est extrait, segmenté et normalisé. MiniLM représente les compétences par des vecteurs ; la similarité cosinus et les pondérations construisent le bilan.",
-      detail: "Responsabilité : extraire, comparer et expliquer les écarts.",
-    },
-    {
-      color: "blue",
-      icon: Database,
-      name: "04 · La mémoire du prototype",
-      stack: "SQLite · stockage local",
-      text: "Les bilans sont enregistrés seulement à votre demande. L’API lit et écrit dans un fichier SQLite pour les retrouver après un redémarrage.",
-      detail: "Responsabilité : enregistrer, lister, rouvrir et supprimer.",
-    },
-  ];
-  return (
-    <>
-      <PageHeading
-        eyebrow="L’ARCHITECTURE DU PROJET"
-        title="Une interface fluide. Un moteur explicable."
-        text="Chaque couche a un rôle précis. Voici le trajet de vos documents, du navigateur à votre bilan."
-      />
-      <div
-        className="architecture-flow glass-card"
-        aria-label="Flux des données"
-      >
-        <span>
-          <FileText size={20} />
-          CV + offre
-        </span>
-        <ArrowRight size={18} />
-        <span>
-          <LayoutDashboard size={20} />
-          React
-        </span>
-        <ArrowRight size={18} />
-        <span>
-          <Code2 size={20} />
-          FastAPI
-        </span>
-        <ArrowRight size={18} />
-        <span>
-          <Sparkles size={20} />
-          Pipeline NLP
-        </span>
-        <ArrowRight size={18} />
-        <span>
-          <AudioLines size={20} />
-          Bilan JSON
-        </span>
-        <ArrowRight size={18} />
-        <span>
-          <Database size={20} />
-          SQLite, si enregistré
-        </span>
-      </div>
-      <p className="method-notice">
-        <CircleHelp size={18} />
-        Le cahier des charges définit le pipeline d’analyse. React remplace
-        Streamlit et SQLite ajoute l’historique à votre demande pour ce
-        prototype.
-      </p>
-      <div className="architecture-layers">
-        {layers.map(({ color, icon: Icon, name, stack, text, detail }) => (
-          <section className="glass-card architecture-layer" key={name}>
-            <span className={`document-icon ${color}`}>
-              <Icon size={22} />
-            </span>
-            <h2>{name}</h2>
-            <span className="architecture-stack">{stack}</span>
-            <p>{text}</p>
-            <div className="architecture-responsibility">{detail}</div>
-          </section>
-        ))}
-      </div>
-      <div className="architecture-details">
-        <section className="glass-card">
-          <h2>Le pipeline, étape par étape.</h2>
-          <ol>
-            <li>
-              <strong>Lire & nettoyer</strong>
-              <p>
-                PyMuPDF lit les PDF ; python-docx lit les DOCX. Le texte est
-                nettoyé et découpé en sections.
-              </p>
-            </li>
-            <li>
-              <strong>Reconnaître & normaliser</strong>
-              <p>
-                Le dictionnaire spaCy regroupe les variantes d’une compétence et
-                extrait les diplômes et durées explicites.
-              </p>
-            </li>
-            <li>
-              <strong>Comparer & calculer</strong>
-              <p>
-                all-MiniLM-L6-v2 produit des embeddings denses. Les alias,
-                relations et similarités alimentent les états Couvert, Partiel,
-                Absent et le score pondéré.
-              </p>
-            </li>
-            <li>
-              <strong>Conseiller & restituer</strong>
-              <p>
-                Le backend renvoie un résultat typé. Les conseils locaux sont
-                toujours disponibles ; un service LLM compatible peut les
-                enrichir si vous l’activez.
-              </p>
-            </li>
-          </ol>
-        </section>
-        <section className="glass-card">
-          <h2>Des frontières claires.</h2>
-          <div className="architecture-fact">
-            <ShieldCheck size={20} />
-            <div>
-              <strong>SQLite : votre historique local</strong>
-              <p>
-                « Enregistrer ce bilan » sauvegarde le résultat et ses preuves
-                dans une base sur cet ordinateur. Retrouvez-le dans Bilans
-                enregistrés, même après un redémarrage, ou supprimez-le. Les
-                fichiers originaux ne sont pas conservés.
-              </p>
-            </div>
-          </div>
-          <div className="architecture-fact">
-            <Code2 size={20} />
-            <div>
-              <strong>Un seul point d’entrée en production</strong>
-              <p>
-                FastAPI sert le site React compilé et l’API sur le même port. En
-                développement, Vite transmet les requêtes API au backend.
-              </p>
-            </div>
-          </div>
-          <div className="architecture-fact">
-            <Sparkles size={20} />
-            <div>
-              <strong>Génération de texte facultative</strong>
-              <p>
-                Avec votre accord, seules les preuves nécessaires sont envoyées
-                au service configuré. Les réponses sont validées ; le repli
-                local reste explicite.
-              </p>
-            </div>
-          </div>
-          <div className="method-notice">
-            <CircleHelp size={18} />
-            <span>
-              Le modèle est chargé avant que l’API soit prête. Les temps
-              affichés mesurent l’analyse, pas le téléchargement initial.
-            </span>
-          </div>
-        </section>
-      </div>
-    </>
   );
 }
 
@@ -1215,7 +1028,7 @@ function AnalysisForm({
         <div className="analysis-submit">
           <span>
             <ShieldCheck size={14} />
-            PDF textuels · 30 pages max. · Aucun compte nécessaire
+            PDF textuels · 30 pages max. · Analyse locale
           </span>
           <div>
             {loading && (
@@ -1338,13 +1151,7 @@ function Results({ result, demo, navigate }) {
             <span>ADÉQUATION GLOBALE</span>
             <Target size={21} />
           </div>
-          <div className="large-score">
-            {number(result.score)}
-            <span>/100</span>
-          </div>
-          <div className="score-bar">
-            <span style={{ width: `${result.score}%` }} />
-          </div>
+          <ScoreGauge score={result.score} />
           <p>
             Une lecture de votre CV,
             <br />
@@ -1394,6 +1201,18 @@ function Results({ result, demo, navigate }) {
                 {component.score === null ? "—" : number(component.score)}
                 <small>{component.score !== null ? "%" : ""}</small>
               </strong>
+              {component.score !== null && (
+                <div
+                  className="criterion-meter"
+                  role="meter"
+                  aria-label={c.label}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={component.score}
+                >
+                  <i style={{ width: `${component.score}%` }} />
+                </div>
+              )}
               <span>
                 {component.score === null
                   ? "Non exigé par l’offre"
@@ -1681,103 +1500,6 @@ function Plan({ result }) {
         )}
       </section>
       <Exports result={result} />
-    </>
-  );
-}
-
-function Settings({ weights, setWeights, llm, setLLM }) {
-  const total = Object.values(weights).reduce((a, b) => a + Number(b), 0);
-  return (
-    <>
-      <PageHeading
-        eyebrow="UNE ANALYSE QUI VOUS RESSEMBLE"
-        title="À chaque objectif, ses priorités."
-        text="Ajustez l’importance des critères. Vos changements s’appliquent à la prochaine analyse."
-      />
-      <div className="settings-grid">
-        <section className="glass-card settings-card">
-          <div className="section-title">
-            <h2>Pondération du score</h2>
-            <span className={`subtle-badge ${total !== 100 ? "invalid" : ""}`}>
-              {total} / 100 %
-            </span>
-          </div>
-          <p className="muted">
-            Répartissez exactement 100 points entre les quatre dimensions.
-          </p>
-          {criteria.map((c) => (
-            <div className="weight-control" key={c.key}>
-              <label htmlFor={c.key}>
-                {c.label}
-                <strong>{weights[c.key]} %</strong>
-              </label>
-              <input
-                id={c.key}
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={weights[c.key]}
-                onChange={(e) =>
-                  setWeights({ ...weights, [c.key]: Number(e.target.value) })
-                }
-                style={{ "--range-color": `var(--${c.color})` }}
-              />
-              <span>
-                0 %<span>100 %</span>
-              </span>
-            </div>
-          ))}
-          {total !== 100 && (
-            <p className="field-error" role="alert">
-              Ajustez le total à 100 % pour lancer une analyse.
-            </p>
-          )}
-          <button
-            className="button button-ghost button-small"
-            onClick={() => setWeights({ ...defaultWeights })}
-          >
-            <RotateCcw size={14} />
-            Rétablir 50 / 25 / 15 / 10
-          </button>
-        </section>
-        <div>
-          <section className="glass-card settings-card">
-            <div className="section-title">
-              <h2>Conseils enrichis</h2>
-              <Sparkles size={20} />
-            </div>
-            <label className="switch-label">
-              <input
-                type="checkbox"
-                checked={llm}
-                onChange={(e) => setLLM(e.target.checked)}
-              />
-              <span className="switch-track" />
-              <strong>Utiliser le modèle de langage</strong>
-            </label>
-            <p className="muted">
-              Cette option envoie les preuves de compétences au service
-              configuré par l’administrateur. Les extraits peuvent contenir des
-              données personnelles.
-            </p>
-            <p className="muted">
-              Si le service n’est pas disponible, des conseils locaux sont
-              affichés avec un avertissement. Ils ne sont pas présentés comme
-              une génération par LLM.
-            </p>
-          </section>
-          <section className="settings-note orange">
-            <ShieldCheck size={26} />
-            <h3>Vous gardez la main.</h3>
-            <p>
-              Les réglages et les bilans non enregistrés restent dans cet
-              onglet. Les bilans que vous enregistrez restent dans SQLite
-              jusqu’à leur suppression.
-            </p>
-          </section>
-        </div>
-      </div>
     </>
   );
 }

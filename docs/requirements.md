@@ -34,7 +34,7 @@ extension demandée ensuite : le cahier initial ne l'imposait pas. Il conserve l
 après un enregistrement explicite et permet leur réouverture et suppression. Les originaux PDF/DOCX
 ne sont pas stockés durablement, mais les bilans enregistrés contiennent des extraits personnels.
 
-- Pas d'OCR, d'authentification, de classement collectif ni de déploiement public dans le périmètre.
+- Pas d’OCR ni de classement collectif ni de déploiement public dans le périmètre.
 - Aucun corpus annoté fourni : précision NER, qualité de matching et équité non évaluées statistiquement.
 - Pas de modèle génératif installé sur cette machine ; l'adaptateur et le repli sont implémentés,
   l'activation d'un service compatible est documentée dans le README.

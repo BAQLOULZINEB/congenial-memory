@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import ValidationError
@@ -11,6 +11,8 @@ from starlette.concurrency import run_in_threadpool
 
 from backend import storage
 from backend.analysis import analyze
+from backend.auth import utilisateur_courant
+from backend.auth_routes import router as auth_router
 from backend.config import settings
 from backend.embeddings import get_embedder
 from backend.extraction import nlp
@@ -39,12 +41,15 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Talent Match API", version="0.1.0", lifespan=lifespan)
+app.include_router(auth_router)
 FRONTEND_DIST = Path(__file__).resolve().parents[1] / "frontend-react" / "dist"
 
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request, exc):
-    return JSONResponse(status_code=422, content={"detail": "Données invalides. Vérifiez les textes et pondérations.",
+    message = ("Vérifiez votre nom, votre email et votre mot de passe (8 caractères minimum, 72 octets maximum)."
+               if request.url.path.startswith("/api/auth/") else "Données invalides. Vérifiez les textes et pondérations.")
+    return JSONResponse(status_code=422, content={"detail": message,
                                                  "fields": [list(error["loc"]) for error in exc.errors()]})
 
 
@@ -93,29 +98,29 @@ async def analyze_files(
 
 
 @app.post("/api/analyses", response_model=SavedAnalysisSummary, status_code=201)
-def save_analysis(request: SaveAnalysisRequest):
+def save_analysis(request: SaveAnalysisRequest, user: Annotated[dict, Depends(utilisateur_courant)]):
     try:
-        return storage.save(request.title, request.result.model_dump(), request.is_demo)
+        return storage.save(request.title, request.result.model_dump(), request.is_demo, user["id"])
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
 
 @app.get("/api/analyses", response_model=SavedAnalysisPage)
-def list_analyses(limit: int = Query(12, ge=1, le=100), offset: int = Query(0, ge=0)):
-    return storage.list_saved(limit, offset)
+def list_analyses(user: Annotated[dict, Depends(utilisateur_courant)], limit: int = Query(12, ge=1, le=100), offset: int = Query(0, ge=0)):
+    return storage.list_saved(limit, offset, user["id"])
 
 
 @app.get("/api/analyses/{analysis_id}", response_model=SavedAnalysis)
-def get_analysis(analysis_id: str):
-    saved = storage.get_saved(analysis_id)
+def get_analysis(analysis_id: str, user: Annotated[dict, Depends(utilisateur_courant)]):
+    saved = storage.get_saved(analysis_id, user["id"])
     if saved is None:
         raise HTTPException(404, "Ce bilan n'existe plus.")
     return saved
 
 
 @app.delete("/api/analyses/{analysis_id}", status_code=204)
-def delete_analysis(analysis_id: str):
-    if not storage.delete_saved(analysis_id):
+def delete_analysis(analysis_id: str, user: Annotated[dict, Depends(utilisateur_courant)]):
+    if not storage.delete_saved(analysis_id, user["id"]):
         raise HTTPException(404, "Ce bilan n'existe plus.")
     return Response(status_code=204)
 

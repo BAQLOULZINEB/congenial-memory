@@ -6,26 +6,51 @@ encadré par Mme Salma Aitoussous.
 
 ## Lancer sur Windows
 
-Prérequis : [uv](https://docs.astral.sh/uv/getting-started/installation/) et accès Internet au premier lancement.
-Python 3.12 est recommandé ; uv peut l'installer automatiquement.
+Prérequis : [uv](https://docs.astral.sh/uv/getting-started/installation/), Node.js 22.12+ avec npm,
+et accès Internet au premier lancement. Python 3.12 est recommandé ; uv peut l'installer automatiquement.
+L'interface utilise React 19, JavaScript, Vite, Tailwind CSS, Framer Motion et Lucide,
+comme le projet de référence immobilier. Streamlit a été retiré.
 
 ```powershell
 uv sync --frozen
 uv run python run.py
 ```
 
-Ou exécuter `start.ps1` depuis PowerShell. Interface : http://127.0.0.1:8501.
-API et documentation interactive : http://127.0.0.1:8000/docs.
+Ou exécuter `start.ps1` depuis PowerShell. Interface : http://127.0.0.1:8000.
+API et documentation interactive : http://127.0.0.1:8000/docs. Le port 8501 n'est plus utilisé.
+Le lanceur installe les dépendances JavaScript avec `npm ci`, compile React puis démarre FastAPI.
+L'interface et l'API partagent la même origine ; aucun serveur Vite n'est nécessaire pour cette utilisation.
 Le modèle MiniLM est téléchargé au premier lancement puis conservé dans le cache Hugging Face.
-Le lanceur attend le chargement avant d'ouvrir le navigateur. Ctrl+C arrête les deux services.
-Les ports 8000 et 8501 doivent être libres.
+Le lanceur attend le chargement avant d'ouvrir le navigateur. Ctrl+C arrête le service.
+Le port 8000 doit être libre. SQLite conserve uniquement les bilans explicitement enregistrés.
 
-Lancement séparé, dans deux terminaux à la racine :
+Pour réutiliser un build existant sans réinstaller ou compiler :
+
+```powershell
+uv run python run.py --skip-build
+```
+
+Ajouter `--no-browser` pour ne pas ouvrir automatiquement un onglet.
+
+## Développement React
+
+Dans un premier terminal à la racine :
 
 ```powershell
 uv run uvicorn backend.main:app --host 127.0.0.1 --port 8000
-uv run streamlit run frontend/app.py --server.address 127.0.0.1
 ```
+
+Dans un second terminal :
+
+```powershell
+cd frontend-react
+npm ci
+npm run dev
+```
+
+Vite sert alors l'interface sur http://127.0.0.1:5173 et relaie `/api` et `/health` vers FastAPI.
+Ne lancez pas `run.py` et la commande uvicorn en parallèle sur le même port.
+Pour une livraison compilée : `npm run build` dans `frontend-react`, puis `uv run python run.py --skip-build` à la racine.
 
 ## Utiliser
 
@@ -33,11 +58,18 @@ uv run streamlit run frontend/app.py --server.address 127.0.0.1
 2. Importer une offre PDF/DOCX ou coller sa description. Utiliser une seule source par document.
 3. Ajuster les quatre poids, dont la somme doit rester égale à 100 %.
 4. Lancer l'analyse, consulter les preuves et les compétences couvertes, partielles et absentes.
-5. Exporter le bilan HTML imprimable, la matrice CSV ou le résultat JSON complet.
+5. Choisir **Enregistrer ce bilan** pour le conserver dans SQLite, puis le retrouver dans **Bilans enregistrés**.
+6. Exporter le bilan HTML imprimable, la matrice CSV ou le résultat JSON complet.
    Ouvrir le HTML dans un navigateur puis **Imprimer → Enregistrer en PDF**.
 
-Le mode démonstration charge `examples/cv.txt` et `examples/job.txt`.
-Aucun fichier utilisateur n'est enregistré par le backend. Les résultats restent dans la session Streamlit.
+Le mode démonstration fournit un exemple de CV et d'offre sans utiliser de données personnelles.
+Le backend ne conserve pas les fichiers utilisateur après leur traitement. Le mécanisme d'import de FastAPI
+peut utiliser des fichiers temporaires sur disque pour les téléversements volumineux ; ils sont fermés à la fin
+du traitement de la requête. Les résultats non enregistrés disparaissent au rechargement de la page.
+Les bilans enregistrés restent dans `data/talentmatch.sqlite3` jusqu'à leur suppression depuis l'historique.
+Ils contiennent les extraits des documents, mais pas les fichiers originaux. La base locale n'est pas chiffrée
+par l'application et est exclue de Git. `DATABASE_PATH` personnalise son emplacement.
+Les exports sont téléchargés explicitement par l'utilisateur.
 
 ## Génération textuelle
 
@@ -60,10 +92,15 @@ La génération peut prendre jusqu'à 45 secondes, hors objectif de latence du c
 
 ## Architecture
 
+Le [guide d'architecture](docs/architecture.md) explique les couches, le parcours d'une analyse,
+les échanges React/FastAPI, le calcul NLP et le traitement des données, avec des diagrammes.
+
 ```text
-frontend/app.py       Streamlit : saisie, graphiques, preuves, exports
-frontend/reports.py   HTML imprimable et CSV protégés contre l'injection
-backend/main.py       FastAPI : contrats JSON et multipart, readiness
+frontend-react/src/   React/JS : dashboard, formulaires, résultats, conseils et exports
+frontend-react/dist/ Build de production Vite (généré, ignoré par Git)
+frontend/reports.py   Exporteurs Python historiques conservés pour usages programmatiques
+backend/main.py       FastAPI : contrats JSON et multipart, readiness, service du build React
+backend/storage.py    SQLite : sauvegarde, liste, réouverture et suppression des bilans
 backend/parsing.py    Lecture PDF/DOCX et nettoyage
 backend/extraction.py spaCy EntityRuler, segmentation, durées et diplômes
 backend/taxonomy.py   Dictionnaire bilingue, relations dirigées et ressources
@@ -71,7 +108,7 @@ backend/embeddings.py Sentence-Transformers / Hugging Face, modèle chargé une 
 backend/analysis.py   Similarités, matrice d'écarts et score composite
 backend/recommendations.py  Conseils locaux + génération optionnelle
 backend/schemas.py    Structures Pydantic typées et validées
-tests/               Tests du pipeline, API, sécurité des exports et interface
+tests/               Tests du pipeline, API, sécurité des exports et service du build React
 ```
 
 Le frontend appelle uniquement l'API pour l'analyse. Aucun calcul NLP dans la couche de présentation.
@@ -98,7 +135,18 @@ Pondération par défaut : `0.50 × technique + 0.25 × expérience + 0.15 × fo
 
 ```powershell
 uv run pytest -q
-uv run ruff check .
+uv run ruff check backend frontend tests run.py scripts
+cd frontend-react
+npm test
+npm run lint
+npm run build
+```
+
+Avec l'application en cours d'exécution, le parcours d'intégration HTTP peut être vérifié depuis la racine :
+
+```powershell
+uv run python scripts/smoke_react.py
+uv run python scripts/benchmark.py
 ```
 
 Les tests unitaires injectent des embeddings déterministes : ils vérifient la logique sans télécharger de modèle.
@@ -122,4 +170,5 @@ Les durées de chaque analyse sont affichées. Ce n'est pas une garantie sur tou
 - [FastAPI : fichiers et formulaires](https://fastapi.tiangolo.com/tutorial/request-forms-and-files/)
 - [spaCy : EntityRuler](https://spacy.io/api/entityruler)
 - [Sentence-Transformers : encode et normalisation](https://www.sbert.net/docs/package_reference/sentence_transformer/model.html)
-- [Streamlit : import de fichiers](https://docs.streamlit.io/develop/api-reference/widgets/st.file_uploader)
+- [React : interface utilisateur](https://react.dev/learn)
+- [Vite : compilation et développement](https://vite.dev/guide/)

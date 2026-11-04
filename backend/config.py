@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://localhost:11434/v1"
     llm_model: str = "qwen2.5:3b"
     llm_api_key: str = ""
+    database_path: str = "data/talentmatch.sqlite3"
     max_file_bytes: int = 5 * 1024 * 1024
     max_text_chars: int = 30000
 

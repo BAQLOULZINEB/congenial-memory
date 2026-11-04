@@ -89,3 +89,26 @@ class AnalysisResult(StrictModel):
     warnings: list[str]
     timings_ms: dict[str, float]
     embedding_model: str
+
+
+class SaveAnalysisRequest(StrictModel):
+    title: str = Field(min_length=1, max_length=100)
+    result: AnalysisResult
+    is_demo: bool = False
+
+
+class SavedAnalysisSummary(StrictModel):
+    id: str
+    title: str
+    created_at: str
+    score: float = Field(ge=0, le=100)
+    is_demo: bool = False
+
+
+class SavedAnalysis(SavedAnalysisSummary):
+    result: AnalysisResult
+
+
+class SavedAnalysisPage(StrictModel):
+    items: list[SavedAnalysisSummary]
+    total: int = Field(ge=0)

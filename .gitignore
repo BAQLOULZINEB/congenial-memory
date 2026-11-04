@@ -7,3 +7,12 @@ __pycache__/
 tmp/
 output/
 .cache/
+node_modules/
+frontend-react/dist/
+frontend-react/coverage/
+playwright-report/
+test-results/
+data/
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal

@@ -1,5 +1,8 @@
-"""Start both local services and terminate them cleanly with Ctrl+C."""
+"""Build React and run the local, same-origin FastAPI application."""
+import argparse
 import os
+import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -9,50 +12,71 @@ from pathlib import Path
 import httpx
 
 ROOT = Path(__file__).resolve().parent
+FRONTEND = ROOT / "frontend-react"
+URL = "http://127.0.0.1:8000"
+
+
+def build_frontend():
+    npm = shutil.which("npm.cmd" if os.name == "nt" else "npm")
+    if not npm:
+        raise SystemExit("Node.js 22.12+ et npm sont requis. Installez Node.js puis relancez le projet.")
+    if not (FRONTEND / "package-lock.json").is_file():
+        raise SystemExit("Le fichier frontend-react/package-lock.json est manquant.")
+    print("Installation des dépendances React verrouillées…", flush=True)
+    subprocess.run([npm, "ci", "--no-audit", "--no-fund"], cwd=FRONTEND, check=True)
+    subprocess.run([npm, "run", "build"], cwd=FRONTEND, check=True)
 
 
 def main():
-    processes = []
-    env = {**os.environ, "PYTHONUTF8": "1", "API_BASE_URL": "http://127.0.0.1:8000"}
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--no-browser", action="store_true", help="Ne pas ouvrir le navigateur")
+    parser.add_argument("--skip-build", action="store_true", help="Réutiliser frontend-react/dist déjà compilé")
+    args = parser.parse_args()
+    with socket.socket() as probe:
+        probe.settimeout(1)
+        if probe.connect_ex(("127.0.0.1", 8000)) == 0:
+            raise SystemExit("Le port 8000 est déjà utilisé. Arrêtez ce service avant de démarrer.")
     try:
-        with httpx.Client(timeout=1) as client:
-            for port in (8000, 8501):
-                try:
-                    client.get(f"http://127.0.0.1:{port}")
-                except httpx.HTTPError:
-                    continue
-                raise SystemExit(f"Le port {port} est déjà utilisé. Arrêtez ce service avant de démarrer.")
-        processes.append(subprocess.Popen([sys.executable, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000"], cwd=ROOT, env=env))
+        if not args.skip_build:
+            build_frontend()
+        elif not (FRONTEND / "dist" / "index.html").is_file():
+            raise SystemExit("Aucun build React disponible. Relancez sans --skip-build.")
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit("La compilation React a échoué. Consultez le message npm ci-dessus.") from exc
+    process = None
+    try:
+        process = subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000"],
+            cwd=ROOT, env={**os.environ, "PYTHONUTF8": "1"},
+        )
         print("Chargement du modèle ; le premier lancement peut nécessiter un téléchargement.", flush=True)
         deadline = time.monotonic() + 600
-        while time.monotonic() < deadline:
-            if processes[0].poll() is not None:
-                raise SystemExit("Le backend a échoué. Consultez le message ci-dessus.")
-            try:
-                if httpx.get("http://127.0.0.1:8000/health", timeout=2).json().get("status") == "ready":
-                    break
-            except (httpx.HTTPError, ValueError):
-                pass
-            time.sleep(1)
-        else:
-            raise SystemExit("Le modèle n'a pas pu être chargé en 10 minutes.")
-        processes.append(subprocess.Popen([sys.executable, "-m", "streamlit", "run", "frontend/app.py", "--server.address", "127.0.0.1"], cwd=ROOT, env=env))
-        print("Talent Match : http://127.0.0.1:8501 — Ctrl+C pour arrêter.", flush=True)
-        time.sleep(2)
-        if "--no-browser" not in sys.argv:
-            webbrowser.open("http://127.0.0.1:8501")
-        while all(p.poll() is None for p in processes):
-            time.sleep(1)
+        with httpx.Client(timeout=2) as client:
+            while time.monotonic() < deadline:
+                if process.poll() is not None:
+                    raise SystemExit("Le backend a échoué. Consultez le message ci-dessus.")
+                try:
+                    if client.get(URL + "/health").json().get("status") == "ready":
+                        break
+                except (httpx.HTTPError, ValueError):
+                    pass
+                time.sleep(1)
+            else:
+                raise SystemExit("Le modèle n'a pas pu être chargé en 10 minutes.")
+        print(f"Talent Match : {URL} — Ctrl+C pour arrêter.", flush=True)
+        if not args.no_browser:
+            webbrowser.open(URL)
+        process.wait()
     except KeyboardInterrupt:
         pass
     finally:
-        for process in reversed(processes):
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
 
 
 if __name__ == "__main__":

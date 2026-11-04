@@ -1,24 +1,36 @@
+import re
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
+from backend import storage
 from backend.analysis import analyze
 from backend.config import settings
 from backend.embeddings import get_embedder
 from backend.extraction import nlp
 from backend.parsing import DocumentError, extract_document
-from backend.schemas import AnalysisRequest, AnalysisResult, Weights
+from backend.schemas import (
+    AnalysisRequest,
+    AnalysisResult,
+    SaveAnalysisRequest,
+    SavedAnalysis,
+    SavedAnalysisPage,
+    SavedAnalysisSummary,
+    Weights,
+)
 
 
 @asynccontextmanager
 async def lifespan(app):
     # Load before readiness: the first user's request must not download model weights.
     app.state.ready = False
+    storage.initialize()
     nlp()
     engine = get_embedder()
     engine.encode(["Initialisation du modèle"])
@@ -27,6 +39,7 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Talent Match API", version="0.1.0", lifespan=lifespan)
+FRONTEND_DIST = Path(__file__).resolve().parents[1] / "frontend-react" / "dist"
 
 
 @app.exception_handler(RequestValidationError)
@@ -77,3 +90,55 @@ async def analyze_files(
         # Do not include Pydantic input values (potentially the complete CV) in error responses.
         detail = "Vérifiez les textes (30–30 000 caractères) et les pondérations." if isinstance(exc, ValidationError) else str(exc)
         raise HTTPException(422, detail) from exc
+
+
+@app.post("/api/analyses", response_model=SavedAnalysisSummary, status_code=201)
+def save_analysis(request: SaveAnalysisRequest):
+    try:
+        return storage.save(request.title, request.result.model_dump(), request.is_demo)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.get("/api/analyses", response_model=SavedAnalysisPage)
+def list_analyses(limit: int = Query(12, ge=1, le=100), offset: int = Query(0, ge=0)):
+    return storage.list_saved(limit, offset)
+
+
+@app.get("/api/analyses/{analysis_id}", response_model=SavedAnalysis)
+def get_analysis(analysis_id: str):
+    saved = storage.get_saved(analysis_id)
+    if saved is None:
+        raise HTTPException(404, "Ce bilan n'existe plus.")
+    return saved
+
+
+@app.delete("/api/analyses/{analysis_id}", status_code=204)
+def delete_analysis(analysis_id: str):
+    if not storage.delete_saved(analysis_id):
+        raise HTTPException(404, "Ce bilan n'existe plus.")
+    return Response(status_code=204)
+
+
+@app.get("/{path:path}", include_in_schema=False)
+def frontend(path: str):
+    """Serve the production SPA after every API route, with a bounded filesystem root."""
+    parts = path.replace("\\", "/").split("/")
+    if any(part in {".", ".."} for part in parts):
+        raise HTTPException(404, "Ressource introuvable.")
+    if parts[0] in {"api", "health", "docs", "redoc", "openapi.json"}:
+        raise HTTPException(404, "Route API introuvable.")
+    root = FRONTEND_DIST.resolve()
+    target = (root / path).resolve()
+    if not target.is_relative_to(root):
+        raise HTTPException(404, "Ressource introuvable.")
+    if target.is_file():
+        immutable = parts[0] == "assets" and bool(re.search(r"-[A-Za-z0-9_-]{8,}\.", target.name))
+        cache = "public, max-age=31536000, immutable" if immutable else "no-cache"
+        return FileResponse(target, headers={"Cache-Control": cache, "X-Content-Type-Options": "nosniff"})
+    if parts[0] == "assets" or Path(path).suffix:
+        raise HTTPException(404, "Fichier introuvable.")
+    index = root / "index.html"
+    if not index.is_file():
+        raise HTTPException(503, "Interface non compilée. Lancez python run.py ou npm run build dans frontend-react.")
+    return FileResponse(index, headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"})

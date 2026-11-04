@@ -1,0 +1,58 @@
+/* Reuse the dashboard surfaces and tokens; keep the auth layout unchanged. */
+.auth-page {
+  background: linear-gradient(130deg, #1b1b27, #101018 75%);
+}
+.auth-frame {
+  background: linear-gradient(130deg, #1b1b27, #101018 75%);
+  border-color: var(--line);
+}
+.auth-art {
+  background: var(--purple);
+  color: #2b203b;
+  border-radius: var(--radius);
+}
+.auth-art-type em,
+.auth-art > p,
+.auth-paper,
+.auth-art-footer {
+  color: #2b203b;
+}
+.auth-art-footer {
+  border-top: 0;
+}
+.auth-input {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--text);
+}
+.auth-input:focus {
+  border-color: var(--purple);
+  box-shadow: none;
+  outline: 3px solid var(--purple);
+  outline-offset: 4px;
+}
+.auth-label,
+.auth-page .brand-lockup {
+  color: var(--text);
+}
+.auth-link,
+.auth-page .brand-lockup > svg {
+  color: var(--purple);
+}
+.auth-submit {
+  background: var(--lime);
+  color: #252b18;
+}
+.auth-submit:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+}
+.auth-footnote,
+.auth-help {
+  font-size: 12px;
+  color: var(--text-caption);
+}
+.auth-art-footer {
+  font-size: 12px;
+}

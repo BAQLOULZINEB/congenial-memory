@@ -81,5 +81,3 @@ def connexion(donnees: Connexion, bdd: Annotated[sqlite3.Connection, Depends(get
 @router.get("/auth/moi")
 def moi(utilisateur: Annotated[dict, Depends(utilisateur_courant)]):
     return dict(utilisateur)
-
-

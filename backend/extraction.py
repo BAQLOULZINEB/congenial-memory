@@ -4,6 +4,7 @@ from functools import lru_cache
 
 import spacy
 
+from backend.experience import experience_years
 from backend.schemas import Profile, Skill
 from backend.taxonomy import HARD, SOFT
 
@@ -52,25 +53,21 @@ def extract(text: str, is_job: bool = False) -> Profile:
     skills: dict[str, Skill] = {}
     for ent in doc.ents:
         start = max(text.rfind("\n", 0, ent.start_char), text.rfind(".", 0, ent.start_char)) + 1
-        end = text.find("\n", ent.end_char)
-        evidence = text[start:end if end >= 0 else len(text)].strip()[:400]
+        # The evidence is the sentence holding the entity: a following sentence ("AWS est un atout.")
+        # must not make an earlier requirement optional.
+        boundary = re.compile(r"\n|[.!?;](?=\s)").search(text, ent.end_char)
+        end = boundary.start() + (boundary.group() != "\n") if boundary else len(text)
+        evidence = text[start:end].strip()[:400]
         prefix = fold(text[max(start, ent.start_char - 55):ent.start_char])
         if re.search(r"(?:sans|pas de|aucune?|no|not|without|ne maitrise pas)\s+(?:experience (?:en|with)\s+|connaissance (?:de|en)\s+)?$", prefix):
             continue
         optional = bool(re.search(r"souhait|apprecie|bonus|atout|ideale|preferred|nice.to.have|optional", fold(evidence)))
         skill = Skill(name=ent.ent_id_, category="hard_skills" if ent.label_ == "HARD" else "soft_skills",
-                      evidence=evidence, required=not optional if is_job else True)
+                      evidence=evidence, required=not optional if is_job else True, term=ent.text)
         if skill.name not in skills or skill.required:
             skills[skill.name] = skill
-    years = []
     normalized = fold(text)
-    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*(?:a\s*\d+\s*)?\+?\s*(ans?|annees?|years?)\b", normalized):
-        context = normalized[max(0, m.start() - 45):m.end() + 55]
-        if re.search(r"experience|experiences|professionnel|worked|emploi", context):
-            duration = float(m.group(1).replace(",", "."))
-            if 0 <= duration <= 80:
-                years.append(duration)
-    # Explicit durations only: do not double-count overlapping jobs or invent years from graduation dates.
+    sections = segment(text)
     degrees = []
     levels = []
     for pattern, level in [(r"\b(?:doctorat|ph\.?d|phd)\b", 8),
@@ -80,6 +77,6 @@ def extract(text: str, is_job: bool = False) -> Profile:
         for match in re.finditer(pattern, normalized):
             degrees.append(text[match.start():match.end()])
             levels.append(level)
-    return Profile(sections=segment(text), skills=list(skills.values()),
-                   experience_years=max(years) if years else None,
+    return Profile(sections=sections, skills=list(skills.values()),
+                   experience_years=experience_years(normalized, {k: fold(v) for k, v in sections.items()}, is_job),
                    education_level=max(levels) if levels else None, degrees=list(dict.fromkeys(degrees)))

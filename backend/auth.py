@@ -13,6 +13,7 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from backend.config import settings
 from backend.storage import connection, database_path
 
 
@@ -22,6 +23,8 @@ def get_bdd():
 
 
 def signing_key():
+    if settings().jwt_secret:
+        return settings().jwt_secret
     path = database_path().with_suffix(".jwt-key")
     path.parent.mkdir(parents=True, exist_ok=True)
     try:

@@ -99,6 +99,7 @@ def test_explicit_llm_failure_returns_local_result_with_warning(client, monkeypa
     def unavailable(*args):
         raise ValueError("invalid service response")
     monkeypatch.setattr("backend.analysis.generate", unavailable)
+    monkeypatch.setattr("backend.analysis.llm_configured", lambda: True)
     response = client.post("/api/analyze/files", data={"cv_text": CV_TEXT, "job_text": JOB_TEXT,
                                                        "use_llm": "true"})
     assert response.status_code == 200

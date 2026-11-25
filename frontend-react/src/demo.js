@@ -22,6 +22,42 @@ FastAPI est un atout.
 Compétences
 Communication, travail en équipe et autonomie.`;
 
+// All scenarios go through the same API/model as uploaded documents; no preset scores.
+export const demoExamples = [
+  { label: "Data junior", cv: demoCV, job: demoJob },
+  { label: "Data confirmé", job: demoJob, cv: `Profil
+Data scientist, 5 ans d'expérience professionnelle.
+Compétences techniques
+Python, SQL, Machine Learning, scikit-learn, Docker, AWS, FastAPI.
+Expériences professionnelles
+Déploiement de modèles de Machine Learning avec Docker et AWS.
+Formation
+Master informatique.
+Compétences
+Communication, travail en équipe et autonomie.` },
+  { label: "Reconversion", job: demoJob, cv: `Profil
+Début de carrière : 6 mois d'expérience professionnelle en analyse de données.
+Compétences techniques
+Python, Excel.
+Expériences professionnelles
+Préparation de tableaux Excel et scripts Python.
+Formation
+Licence informatique.
+Compétences
+Communication.` },
+  { label: "Parcours daté", job: demoJob, cv: `Profil
+Développeuse data et API.
+Compétences techniques
+Python, SQL, scikit-learn, Docker, FastAPI, Git.
+Expériences professionnelles
+Janvier 2021 - décembre 2022 : développement Python et SQL.
+Janvier 2023 - décembre 2024 : API FastAPI et déploiement Docker.
+Formation
+Master informatique.
+Compétences
+Communication, travail en équipe.` },
+];
+
 export const criteria = [
   {
     key: "hard_skills",

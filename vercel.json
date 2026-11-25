@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "cd frontend-react && npm ci --no-audit --no-fund",
+  "buildCommand": "cd frontend-react && npm run build",
+  "outputDirectory": "frontend-react/dist",
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 120,
+      "memory": 2048,
+      "excludeFiles": "{frontend-react/**,tests/**,docs/**,data/**,output/**,tmp/**,scripts/**,.venv/**}"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/health", "destination": "/api/index" },
+    { "source": "/docs", "destination": "/api/index" },
+    { "source": "/openapi.json", "destination": "/api/index" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

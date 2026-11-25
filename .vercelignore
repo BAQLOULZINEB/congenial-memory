@@ -1,0 +1,13 @@
+.venv
+.pytest_cache
+.ruff_cache
+.streamlit
+data
+output
+tmp
+frontend-react/node_modules
+frontend-react/dist
+frontend-react/coverage
+cv-original.png
+build_cv_project.py
+.env

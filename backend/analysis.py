@@ -7,9 +7,9 @@ from backend.config import settings
 from backend.embeddings import get_embedder
 from backend.extraction import extract
 from backend.parsing import clean_text
-from backend.recommendations import generate, local_recommendations
+from backend.recommendations import generate, llm_configured, local_recommendations
 from backend.schemas import AnalysisRequest, AnalysisResult, Component, Gap
-from backend.taxonomy import HARD, RELATED
+from backend.taxonomy import HARD, IMPLIES, RELATED
 
 
 def analyze(request: AnalysisRequest, embedder=None) -> AnalysisResult:
@@ -31,7 +31,14 @@ def analyze(request: AnalysisRequest, embedder=None) -> AnalysisResult:
         exact = next((s for s in cv_skills if s.name == required.name), None)
         if exact:
             gaps.append(Gap(skill=required.name, category=required.category, status="Couvert", similarity=1,
-                            evidence=exact.evidence, required=required.required))
+                            evidence=exact.evidence, required=required.required, term=required.term))
+            continue
+        # A concrete tool is direct evidence of the concept the offer names (scikit-learn -> ML).
+        implied = next((s for s in cv_skills if required.name in IMPLIES.get(s.name, set())), None)
+        if implied:
+            gaps.append(Gap(skill=required.name, category=required.category, status="Couvert", similarity=1,
+                            evidence=f"Couvert via {implied.name} : {implied.evidence}", required=required.required,
+                            via=implied.name, term=required.term))
             continue
         candidates = []
         for j, candidate in enumerate(cv_skills):
@@ -45,7 +52,7 @@ def analyze(request: AnalysisRequest, embedder=None) -> AnalysisResult:
         gaps.append(Gap(skill=required.name, category=required.category, status="Partiel" if best else "Absent",
                         similarity=round(best[0], 4) if best else 0,
                         evidence=f"Compétence connexe : {best[1].name}. {best[1].evidence}" if best else "Aucune preuve reconnue dans le CV.",
-                        required=required.required))
+                        required=required.required, via=best[1].name if best else None, term=required.term))
     components = {}
     for category in ("hard_skills", "soft_skills"):
         relevant = [g for g in gaps if g.category == category]
@@ -65,7 +72,7 @@ def analyze(request: AnalysisRequest, embedder=None) -> AnalysisResult:
         else:
             components[key] = Component(score=round(min(actual / expected, 1) * 100, 2) if expected else 100,
                                           explanation=f"CV : {actual:g} ; offre : {expected:g}. " +
-                                          ("Années déclarées explicitement, dates non cumulées." if key == "experience" else
+                                          ("Durée explicite ou estimation des périodes professionnelles reconnues, sans double comptage des chevauchements. À vérifier." if key == "experience" else
                                            "Niveau académique uniquement ; spécialité et équivalences à vérifier."))
     weights = request.weights.model_dump()
     available = sum(weights[k] for k, v in components.items() if v.score is not None)
@@ -76,12 +83,16 @@ def analyze(request: AnalysisRequest, embedder=None) -> AnalysisResult:
     if any(v.score is None for v in components.values()):
         warnings.append("Les critères non exigés sont exclus ; les poids restants sont renormalisés.")
     scored = perf_counter()
-    recommendations = local_recommendations(gaps, score)
+    recommendations = local_recommendations(gaps, score, cv, job, components)
     if request.use_llm:
-        try:
-            recommendations = generate(recommendations, gaps)
-        except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):
-            warnings.append("Le service de génération est indisponible ou sa réponse invalide. Conseils locaux affichés.")
+        if not llm_configured():
+            warnings.append("Aucun modèle de langage configuré (LLM_API_KEY). Bilan critique local affiché.")
+        else:
+            try:
+                recommendations = generate(recommendations, gaps, cv, job, components, score)
+            except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):
+                warnings.append("Le service de génération est indisponible ou sa réponse invalide. "
+                                "Bilan critique local affiché.")
     finished = perf_counter()
     return AnalysisResult(score=score, weights=request.weights, effective_weights=effective, components=components,
                           gaps=gaps, cv=cv, job=job, recommendations=recommendations, warnings=warnings,

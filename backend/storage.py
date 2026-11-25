@@ -20,7 +20,9 @@ def database_path() -> Path:
 def connection():
     path = database_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(path, timeout=5)
+    # FastAPI may open a dependency's connection in one worker thread and close it in another.
+    # Each connection still serves a single request at a time, so crossing threads is safe.
+    db = sqlite3.connect(path, timeout=5, check_same_thread=False)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys=ON")
     try:

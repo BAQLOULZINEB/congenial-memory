@@ -41,7 +41,8 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
-import { criteria, defaultWeights, demoCV, demoJob } from "./demo";
+import { criteria, defaultWeights, demoExamples } from "./demo";
+import { readAnalysisSession, writeAnalysisSession } from "./sessionAnalysis";
 import { analyzeDocuments, validateInputs } from "./api";
 import { downloadReport } from "./exports";
 import ScoreGauge from "./ScoreGauge";
@@ -50,6 +51,7 @@ import { useAuth } from "./auth/context/AuthContext";
 import Settings from "./Settings";
 import Architecture from "./Architecture";
 import SavedAnalyses, { SaveAnalysis } from "./SavedAnalyses";
+import { CritiquePanel, VerdictBadge } from "./Critique";
 
 const emptyDoc = () => ({ mode: "file", file: null, text: "" });
 const navItems = [
@@ -70,12 +72,14 @@ const number = (n) =>
 
 export default function App() {
   const { utilisateur, deconnexion } = useAuth();
+  const [restored] = useState(() => readAnalysisSession(utilisateur?.id));
   const [cv, setCV] = useState(emptyDoc);
   const [job, setJob] = useState(emptyDoc);
   const [weights, setWeights] = useState({ ...defaultWeights });
-  const [llm, setLLM] = useState(false);
-  const [result, setResult] = useState(null);
-  const [savedId, setSavedId] = useState(null);
+  const [llm, setLLM] = useState(true);
+  const [result, setResult] = useState(restored?.result ?? null);
+  const [savedId, setSavedId] = useState(restored?.savedId ?? null);
+  const [sessionError, setSessionError] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [mobile, setMobile] = useState(false);
@@ -84,7 +88,8 @@ export default function App() {
   );
   const [status, setStatus] = useState("checking");
   const [demo, setDemo] = useState(false);
-  const [resultDemo, setResultDemo] = useState(false);
+  const [resultDemo, setResultDemo] = useState(restored?.resultDemo ?? false);
+  const [demoIndex, setDemoIndex] = useState(-1);
   const [dirty, setDirty] = useState(false);
   const request = useRef(null);
   const revision = useRef(0);
@@ -93,6 +98,9 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const mainRef = useRef(null);
+  useEffect(() => {
+    setSessionError(!writeAnalysisSession(utilisateur?.id, { result, savedId, resultDemo }));
+  }, [utilisateur?.id, result, savedId, resultDemo]);
   useEffect(() => {
     mainRef.current?.focus({ preventScroll: true });
     if (mainRef.current) mainRef.current.scrollTop = 0;
@@ -171,8 +179,11 @@ export default function App() {
     setError("");
   };
   function loadDemo() {
-    setCV({ mode: "text", text: demoCV, file: null });
-    setJob({ mode: "text", text: demoJob, file: null });
+    const next = (demoIndex + 1) % demoExamples.length;
+    const example = demoExamples[next];
+    setDemoIndex(next);
+    setCV({ mode: "text", text: example.cv, file: null });
+    setJob({ mode: "text", text: example.job, file: null });
     setDemo(true);
     markChanged();
     setError("");
@@ -249,6 +260,7 @@ export default function App() {
       );
     },
     demo,
+    demoIndex,
     loadDemo,
   };
   return (
@@ -424,6 +436,11 @@ export default function App() {
                             savedId={savedId}
                             onSaved={setSavedId}
                           />
+                          <p className="muted" role="status">
+                            {sessionError
+                              ? "Le navigateur ne peut pas conserver ce bilan dans la session. Enregistrez-le dans l’historique pour le retrouver."
+                              : "Bilan conservé pendant la session de cet onglet, même après actualisation. Enregistrez-le pour le retrouver plus tard dans l’historique."}
+                          </p>
                         </>
                       ) : (
                         <EmptyState
@@ -963,6 +980,7 @@ function AnalysisForm({
   submit,
   cancel,
   demo,
+  demoIndex,
   loadDemo,
 }) {
   const total = Object.values(weights).reduce((a, b) => a + Number(b), 0);
@@ -981,7 +999,9 @@ function AnalysisForm({
           disabled={loading}
         >
           <WandSparkles size={15} />
-          {demo ? "Exemple de démonstration chargé" : "Utiliser un exemple"}
+          {demo
+            ? `${demoIndex + 1}/${demoExamples.length} · ${demoExamples[demoIndex].label} · Autre exemple`
+            : "Utiliser un exemple"}
         </button>
       </div>
       <div className="document-grid">
@@ -1014,13 +1034,14 @@ function AnalysisForm({
             <span className="switch-track" />
             <span>
               <strong>
-                Enrichir mes conseils avec un modèle de langage{" "}
+                Bilan critique généré par IA{" "}
                 <Sparkles size={14} />
               </strong>
               <small>
-                Les preuves de compétences seront transmises au service
-                configuré. Sans cette option, vos conseils sont générés
-                localement.
+                Un modèle de langage juge votre CV comme un recruteur exigeant
+                et réécrit vos phrases. Les sections du CV (hors coordonnées)
+                sont transmises au service configuré. Désactivé : bilan
+                critique local.
               </small>
             </span>
           </label>
@@ -1164,6 +1185,7 @@ function Results({ result, demo, navigate }) {
             Votre synthèse
           </span>
           <h2>Vos acquis. Vos prochaines possibilités.</h2>
+          <VerdictBadge verdict={result.recommendations.verdict} />
           <p>{result.recommendations.summary}</p>
           <div className="match-counts">
             <span>
@@ -1182,7 +1204,7 @@ function Results({ result, demo, navigate }) {
           <small>
             Calculé en {number(result.timings_ms.total / 1000)} s · Conseils{" "}
             {result.recommendations.source === "llm"
-              ? "enrichis par modèle de langage"
+              ? "générés par modèle de langage, vérifiés contre le CV"
               : "locaux structurés"}
           </small>
         </section>
@@ -1216,6 +1238,8 @@ function Results({ result, demo, navigate }) {
               <span>
                 {component.score === null
                   ? "Non exigé par l’offre"
+                  : c.key === "experience" && result.cv.experience_years == null
+                    ? "Durée non reconnue · à vérifier"
                   : `Poids effectif : ${number(result.effective_weights[c.key] * 100)} %`}
               </span>
             </section>
@@ -1395,6 +1419,7 @@ function Plan({ result }) {
         title="Votre prochaine version commence ici."
         text="Des pistes concrètes, à votre rythme. Choisissez une priorité et faites le premier pas."
       />
+      <CritiquePanel recommendations={r} />
       <div className="plan-summary">
         <section className="glass-card">
           <h2>
@@ -1489,6 +1514,16 @@ function Plan({ result }) {
             <div>
               <span>PISTE DE REFORMULATION</span>
               <p>{v.suggestion}</p>
+              {v.keywords?.length > 0 && (
+                <p className="rewrite-keywords">
+                  {v.keywords.map((k) => (
+                    <span key={k} className="subtle-badge">
+                      {k}
+                    </span>
+                  ))}
+                </p>
+              )}
+              {v.rationale && <small className="muted">{v.rationale}</small>}
             </div>
           </div>
         ))}
@@ -1578,8 +1613,8 @@ function Method() {
         <h2>Vos données restent vos données</h2>
         <p>
           Les fichiers originaux peuvent être utilisés temporairement pendant
-          l’import puis sont fermés. Les résultats non enregistrés restent en
-          mémoire. Les bilans enregistrés volontairement restent dans la base
+          l’import puis sont fermés. Le dernier bilan est conservé dans la session
+          de cet onglet et effacé à la déconnexion. Les bilans enregistrés volontairement restent dans la base
           SQLite locale jusqu’à leur suppression et contiennent des extraits
           personnels. Les exports JSON contiennent les sections extraites :
           protégez-les comme vos documents personnels. Si vous activez les

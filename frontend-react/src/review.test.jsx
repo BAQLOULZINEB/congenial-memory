@@ -10,6 +10,11 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { analyzeDocuments } from "./api";
+import { demoExamples } from "./demo";
+const auth = vi.hoisted(() => ({ id: null }));
+vi.mock("./auth/context/AuthContext", () => ({
+  useAuth: () => ({ utilisateur: auth.id == null ? null : { id: auth.id, nom: "Test" }, deconnexion: vi.fn() }),
+}));
 
 vi.mock("./api", async (importOriginal) => ({
   ...(await importOriginal()),
@@ -81,6 +86,8 @@ function startPendingDemo() {
 }
 
 beforeEach(() => {
+  auth.id = null;
+  sessionStorage.clear();
   vi.clearAllMocks();
   vi.stubGlobal(
     "fetch",
@@ -96,6 +103,29 @@ afterEach(() => {
 });
 
 describe("Independent result provenance review", () => {
+  it("restores a completed report after remount for the same account only", async () => {
+    auth.id = 42;
+    const pending = startPendingDemo();
+    await act(async () => pending.resolve(result));
+    await screen.findByText("Résultat de la candidature soumise.");
+    cleanup();
+    render(<MemoryRouter initialEntries={["/resultats"]}><App /></MemoryRouter>);
+    expect(await screen.findByText("Résultat de la candidature soumise.")).toBeInTheDocument();
+    expect(screen.getByText(/candidature de démonstration/i)).toBeInTheDocument();
+    cleanup();
+    auth.id = 43;
+    render(<MemoryRouter initialEntries={["/resultats"]}><App /></MemoryRouter>);
+    expect(await screen.findByText("Votre premier bilan vous attend.")).toBeInTheDocument();
+  });
+  it("cycles all examples, fills both documents, and wraps back to the first", () => {
+    render(<MemoryRouter initialEntries={["/analyse"]}><App /></MemoryRouter>);
+    for (let i = 0; i <= demoExamples.length; i++) {
+      fireEvent.click(screen.getByRole("button", { name: i === 0 ? "Utiliser un exemple" : /Autre exemple/ }));
+      const expected = demoExamples[i % demoExamples.length];
+      expect(screen.getByRole("textbox", { name: "Texte du CV" })).toHaveValue(expected.cv);
+      expect(screen.getByRole("textbox", { name: "Texte de l’offre" })).toHaveValue(expected.job);
+    }
+  });
   it("marks a completed old request stale when settings change while it runs", async () => {
     const pending = startPendingDemo();
     expect(analyzeDocuments).toHaveBeenCalledOnce();

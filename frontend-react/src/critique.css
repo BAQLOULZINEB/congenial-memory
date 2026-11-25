@@ -1,0 +1,81 @@
+.verdict-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid currentColor;
+}
+.verdict-good { color: var(--lime); }
+.verdict-fair { color: var(--purple); }
+.verdict-weak { color: var(--orange); }
+.verdict-bad { color: #ff6b6b; }
+
+.critique-panel {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 28px;
+}
+.critique-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.critique-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+.critique-rationale { margin: 0; line-height: 1.6; }
+.critique-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.critique-item {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid var(--line);
+}
+.critique-item p { margin: 4px 0 0; line-height: 1.55; }
+.severity-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: fit-content;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.severity-bloquant { border-left-color: #ff6b6b; }
+.severity-bloquant .severity-tag { color: #ff6b6b; }
+.severity-majeur { border-left-color: var(--orange); }
+.severity-majeur .severity-tag { color: var(--orange); }
+.severity-mineur { border-left-color: var(--purple); }
+.severity-mineur .severity-tag { color: var(--purple); }
+
+.rewrite-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+@media (max-width: 640px) {
+  .critique-panel { padding: 18px; }
+  .critique-item { grid-template-columns: 1fr; gap: 6px; }
+}

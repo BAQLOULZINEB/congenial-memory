@@ -1,9 +1,13 @@
 // Adapted from prediction-prix-immobilier: bearer token + JSON auth endpoints.
+import { clearAnalysisSession } from "../sessionAnalysis";
 const TOKEN_KEY = "talentmatch.session";
 export const lireJeton = () => localStorage.getItem(TOKEN_KEY);
 export const enregistrerJeton = (token) =>
   localStorage.setItem(TOKEN_KEY, token);
-export const effacerJeton = () => localStorage.removeItem(TOKEN_KEY);
+export const effacerJeton = () => {
+  clearAnalysisSession();
+  localStorage.removeItem(TOKEN_KEY);
+};
 export function authHeaders() {
   const token = lireJeton();
   return token ? { Authorization: `Bearer ${token}` } : {};

@@ -24,7 +24,7 @@ class AnalysisRequest(StrictModel):
     cv_text: str = Field(min_length=30, max_length=30000)
     job_text: str = Field(min_length=30, max_length=30000)
     weights: Weights = Field(default_factory=Weights)
-    use_llm: bool = False
+    use_llm: bool = True
 
 
 class Skill(StrictModel):
@@ -32,6 +32,7 @@ class Skill(StrictModel):
     category: Literal["hard_skills", "soft_skills"]
     evidence: str
     required: bool = True
+    term: str = ""  # Surface form found in the document (e.g. "apprentissage supervisé").
 
 
 class Profile(StrictModel):
@@ -49,6 +50,8 @@ class Gap(StrictModel):
     similarity: float = Field(ge=0, le=1)
     evidence: str
     required: bool
+    via: str | None = None  # CV skill that covers the requirement indirectly (tool -> concept).
+    term: str = ""  # Wording used by the offer, to reuse in rewrites.
 
 
 class Component(StrictModel):
@@ -66,6 +69,18 @@ class Action(StrictModel):
 class Rewrite(StrictModel):
     original: str
     suggestion: str
+    keywords: list[str] = Field(default_factory=list, max_length=6)
+    rationale: str = ""
+
+
+Verdict = Literal["Solide", "Recevable avec réserves", "Fragile", "Non recommandée en l'état"]
+VERDICT_ORDER: list[str] = ["Non recommandée en l'état", "Fragile", "Recevable avec réserves", "Solide"]
+
+
+class Critique(StrictModel):
+    severity: Literal["bloquant", "majeur", "mineur"]
+    point: str = Field(max_length=300)
+    explanation: str = Field(max_length=1200)
 
 
 class Recommendations(StrictModel):
@@ -75,6 +90,10 @@ class Recommendations(StrictModel):
     rewrites: list[Rewrite] = Field(max_length=8)
     actions: list[Action] = Field(max_length=12)
     source: Literal["local", "llm"] = "local"
+    # Defaults keep analyses saved before the critical review was added readable.
+    verdict: Verdict | None = None
+    verdict_rationale: str = Field(default="", max_length=2000)
+    critique: list[Critique] = Field(default_factory=list, max_length=12)
 
 
 class AnalysisResult(StrictModel):

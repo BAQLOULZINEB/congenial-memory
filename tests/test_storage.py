@@ -76,3 +76,23 @@ def test_reject_invalid_saved_report_and_no_implicit_persistence(store_client, r
     assert store_client.get("/api/analyses").json()["total"] == 0
     with sqlite3.connect(storage.database_path()) as db:
         assert db.execute("SELECT COUNT(*) FROM analyses").fetchone()[0] == 0
+
+
+def test_connection_can_be_closed_from_another_thread(tmp_path, monkeypatch):
+    """FastAPI runs a sync dependency's setup and teardown in possibly different worker threads."""
+    from threading import Thread
+    monkeypatch.setattr(storage, "database_path", lambda: tmp_path / "threads.sqlite3")
+    manager = storage.connection()
+    manager.__enter__()
+    errors = []
+
+    def close():
+        try:
+            manager.__exit__(None, None, None)
+        except Exception as exc:  # noqa: BLE001 - surfaced through the assertion below
+            errors.append(exc)
+
+    worker = Thread(target=close)
+    worker.start()
+    worker.join()
+    assert errors == []

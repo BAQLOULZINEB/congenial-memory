@@ -18,3 +18,8 @@ data/
 *.sqlite3-wal
 
 *.jwt-key
+
+# Personal files kept out of the public repository
+cv-original.png
+build_cv_project.py
+.vercel/

@@ -5,6 +5,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { api, effacerJeton, enregistrerJeton, lireJeton } from "../api.js";
+import { clearAnalysisSession } from "../../sessionAnalysis";
 
 const AuthContext = createContext(null);
 
@@ -43,6 +44,7 @@ export function AuthProvider({ children }) {
     window.addEventListener("talentmatch:session-expired", expire);
     const sync = (event) => {
       if (event.key === "talentmatch.session") {
+        clearAnalysisSession();
         setUtilisateur(null);
         setVerification(Boolean(lireJeton()));
         setJeton(lireJeton());

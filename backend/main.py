@@ -1,6 +1,7 @@
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
+from threading import Lock
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
@@ -11,9 +12,9 @@ from starlette.concurrency import run_in_threadpool
 
 from backend import storage
 from backend.analysis import analyze
-from backend.auth import utilisateur_courant
+from backend.auth import hacher_mot_de_passe, utilisateur_courant
 from backend.auth_routes import router as auth_router
-from backend.config import settings
+from backend.config import SERVERLESS, settings
 from backend.embeddings import get_embedder
 from backend.extraction import nlp
 from backend.parsing import DocumentError, extract_document
@@ -27,21 +28,55 @@ from backend.schemas import (
     Weights,
 )
 
+ROOT = Path(__file__).resolve().parents[1]
+DEMO_ACCOUNT = {"nom": "Compte démo", "email": "demo@talentmatch.test", "mot_de_passe": "TalentMatch-Demo-2026"}
+_startup = Lock()
+
+
+def seed_demo():
+    """Demo account with one real saved report, so a fresh database is usable at once."""
+    with storage.connection() as db:
+        if db.execute("SELECT 1 FROM utilisateurs WHERE email = ?", (DEMO_ACCOUNT["email"],)).fetchone():
+            return
+        user_id = db.execute("INSERT INTO utilisateurs (nom, email, mot_de_passe_hash) VALUES (?, ?, ?) RETURNING id",
+                             (DEMO_ACCOUNT["nom"], DEMO_ACCOUNT["email"],
+                              hacher_mot_de_passe(DEMO_ACCOUNT["mot_de_passe"]))).fetchone()[0]
+    result = analyze(AnalysisRequest(cv_text=(ROOT / "examples/cv.txt").read_text(encoding="utf-8"),
+                                     job_text=(ROOT / "examples/job.txt").read_text(encoding="utf-8"), use_llm=False))
+    storage.save("Démonstration · Data junior → Data Scientist", result.model_dump(mode="json"), True, user_id)
+
+
+def start(app):
+    # Load before readiness: the first user's request must not download model weights.
+    with _startup:
+        if getattr(app.state, "ready", False):
+            return
+        storage.initialize()
+        nlp()
+        get_embedder().encode(["Initialisation du modèle"])
+        if settings().demo_seed:
+            seed_demo()
+        app.state.ready = True
+
 
 @asynccontextmanager
 async def lifespan(app):
-    # Load before readiness: the first user's request must not download model weights.
     app.state.ready = False
-    storage.initialize()
-    nlp()
-    engine = get_embedder()
-    engine.encode(["Initialisation du modèle"])
-    app.state.ready = True
+    await run_in_threadpool(start, app)
     yield
 
 
 app = FastAPI(title="Talent Match API", version="0.1.0", lifespan=lifespan)
 app.include_router(auth_router)
+
+
+if SERVERLESS:
+    @app.middleware("http")
+    async def lazy_start(request, call_next):
+        # A serverless instance may skip the lifespan: start on the first request instead.
+        if not getattr(app.state, "ready", False):
+            await run_in_threadpool(start, app)
+        return await call_next(request)
 FRONTEND_DIST = Path(__file__).resolve().parents[1] / "frontend-react" / "dist"
 
 
@@ -82,7 +117,7 @@ async def analyze_files(
     cv_text: Annotated[str, Form()] = "",
     job_text: Annotated[str, Form()] = "",
     weights: Annotated[str, Form()] = "{}",
-    use_llm: Annotated[bool, Form()] = False,
+    use_llm: Annotated[bool, Form()] = True,
 ):
     try:
         if cv_file and cv_text.strip() or job_file and job_text.strip():

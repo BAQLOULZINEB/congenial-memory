@@ -57,7 +57,9 @@ def test_explicit_match_related_skill_and_missing(request_data):
     result = analyze(request_data, FakeEmbedder())
     gaps = {g.skill: g for g in result.gaps}
     assert gaps["Python"].status == "Couvert"
-    assert gaps["Machine Learning"].status == "Partiel"
+    # scikit-learn on the CV is direct evidence of the "Machine Learning" requirement (cahier §1.2).
+    assert gaps["Machine Learning"].status == "Couvert"
+    assert gaps["Machine Learning"].via == "scikit-learn"
     assert gaps["AWS"].status == "Absent"
     assert gaps["FastAPI"].required is False
     assert result.components["experience"].score == pytest.approx(66.67)
@@ -143,6 +145,7 @@ def test_llm_failure_falls_back_visibly(monkeypatch, request_data):
     def fail(*args):
         raise ValueError("invalid model response")
     monkeypatch.setattr("backend.analysis.generate", fail)
+    monkeypatch.setattr("backend.analysis.llm_configured", lambda: True)
     request_data.use_llm = True
     result = analyze(request_data, FakeEmbedder())
     assert result.recommendations.source == "local"

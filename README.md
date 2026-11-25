@@ -1,180 +1,391 @@
-# Talent Match — Analyseur intelligent de CV et d'offre d'emploi
+﻿<div align="center">
 
-Projet du module IA & Data Science, EMSI, 5AISDR G8, année 2026–2027.
-Réalisé pour le cahier des charges de DRISSI Yassir, BENHEDDANE Mohamed et BAQLOUL Zineb,
-encadré par Mme Salma Aitoussous.
+# Talent Match
 
-## Lancer sur Windows
+### Analyseur intelligent de CV et d'offre d'emploi, avec bilan critique généré par IA
 
-Prérequis : [uv](https://docs.astral.sh/uv/getting-started/installation/), Node.js 22.12+ avec npm,
-et accès Internet au premier lancement. Python 3.12 est recommandé ; uv peut l'installer automatiquement.
-L'interface utilise React 19, JavaScript, Vite, Tailwind CSS, Framer Motion et Lucide,
-comme le projet de référence immobilier. Streamlit a été retiré.
+On donne un **CV** et une **offre d'emploi**. L'application montre **ce qui correspond, ce qui manque, et pourquoi**,
+puis rédige un **bilan critique** comme le ferait un recruteur technique exigeant.
 
-```powershell
-uv sync --frozen
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![spaCy](https://img.shields.io/badge/spaCy-NER-09A3D5?logo=spacy&logoColor=white)
+![ONNX](https://img.shields.io/badge/MiniLM-ONNX%20Runtime-005CED?logo=onnx&logoColor=white)
+![LLM](https://img.shields.io/badge/LLM-Llama%203.3%2070B-7C3AED)
+![SQLite](https://img.shields.io/badge/SQLite-demo%20DB-003B57?logo=sqlite&logoColor=white)
+
+![Tableau de bord des résultats](docs/screenshots/04-resultats.jpg)
+
+**Démo en ligne :** *lien Vercel ajouté après le déploiement*
+**Compte de démonstration :** `demo@talentmatch.test` · mot de passe `TalentMatch-Demo-2026`
+
+Projet du module **IA générative textuelle**, EMSI, 5AISDR G8, 2026–2027.
+DRISSI Yassir · BENHEDDANE Mohamed · BAQLOUL Zineb. Encadrante : Mme Salma Aitoussous.
+
+</div>
+
+---
+
+## Sommaire
+
+1. [Le problème](#1-le-problème)
+2. [La solution en une image](#2-la-solution-en-une-image)
+3. [Visite guidée du dashboard](#3-visite-guidée-du-dashboard)
+4. [Où est l'IA ? Le regard de l'ingénieur](#4-où-est-lia--le-regard-de-lingénieur)
+5. [Ce qu'on a construit](#5-ce-quon-a-construit)
+6. [Lancer en local](#6-lancer-en-local)
+7. [Déployer sur Vercel](#7-déployer-sur-vercel)
+8. [Structure du code](#8-structure-du-code)
+9. [Tests et limites](#9-tests-et-limites)
+
+---
+
+## 1. Le problème
+
+Un candidat envoie le même CV à 50 offres et ne sait pas pourquoi il n'est pas retenu.
+Un recruteur, lui, parcourt un CV en quelques secondes et se pose trois questions :
+
+| Question du recruteur | Ce que Talent Match vérifie |
+|---|---|
+| Les **prérequis** de l'offre sont-ils **prouvés** dans le CV ? | Chaque compétence demandée est cherchée dans le CV, avec la phrase qui le prouve |
+| L'**expérience** et le **diplôme** sont-ils au niveau ? | Années d'expérience et niveau d'études extraits et comparés |
+| Le CV parle-t-il **la langue de l'offre** ? | Les termes exacts de l'offre (ceux que filtrent les ATS) sont recherchés dans le CV |
+
+Talent Match automatise cette lecture et la rend **explicable** : chaque point du score renvoie à une preuve.
+
+## 2. La solution en une image
+
+```mermaid
+flowchart LR
+    A["📄 CV + offre<br/>PDF · DOCX · texte"] --> B["1 · EXTRAIRE<br/>PyMuPDF · spaCy EntityRuler<br/>dictionnaire de 101 compétences"]
+    B --> C["2 · ÉVALUER<br/>MiniLM (embeddings 384 d)<br/>similarité cosinus + score pondéré"]
+    C --> D["3 · GUIDER<br/>LLM au prompt contraint<br/>+ contrôles de sa sortie par code"]
+    D --> E["📊 Score /100 · matrice des écarts<br/>verdict · critique · plan d'action"]
+```
+
+Le navigateur (React) n'effectue aucun calcul : il envoie les documents à l'API **FastAPI**, qui exécute le
+pipeline NLP et renvoie un JSON typé (Pydantic). Les bilans que l'utilisateur choisit d'enregistrer vont dans
+**SQLite**.
+
+---
+
+## 3. Visite guidée du dashboard
+
+Chaque écran ci-dessous vient de l'application réelle, avec le compte de démonstration.
+Pour chacun : **ce que voit l'utilisateur**, puis **ce qui se passe sous le capot**.
+
+### 3.1 Connexion
+
+![Connexion](docs/screenshots/01-connexion.jpg)
+
+**À l'écran :** un espace personnel ; chaque utilisateur ne voit que ses propres bilans.
+**Sous le capot :** mot de passe haché avec **bcrypt** (jamais stocké en clair), puis un **jeton JWT** signé,
+valable 60 minutes, envoyé à chaque requête. Côté serveur, chaque requête SQL filtre par `utilisateur_id`.
+
+### 3.2 Accueil
+
+![Accueil](docs/screenshots/02-accueil.jpg)
+
+**À l'écran :** le parcours en trois temps (Importer → Comprendre → Avancer) et un bouton **Essayer la démo**
+qui charge un CV et une offre d'exemple.
+**Sous le capot :** l'indicateur « Moteur prêt » interroge `GET /health`. Le serveur ne se déclare prêt qu'après
+avoir chargé spaCy et le modèle d'embeddings, pour que la première analyse ne télécharge rien.
+
+### 3.3 Saisie du CV et de l'offre
+
+![Saisie](docs/screenshots/03-analyse.jpg)
+
+**À l'écran :** deux zones (« Votre parcours », « Votre objectif »), en fichier PDF/DOCX ou en texte collé.
+L'option **Bilan critique généré par IA** est activée par défaut. Les pondérations du score sont rappelées en bas.
+**Sous le capot :**
+- **PyMuPDF** lit le PDF avec un tri spatial du texte et retire les en-têtes et pieds de page répétés ;
+  **python-docx** lit les paragraphes et les tableaux.
+- Garde-fous : 5 Mo, 30 pages et 30 000 caractères maximum ; les PDF protégés et les « bombes » ZIP
+  sont refusés.
+- Le texte est normalisé (Unicode NFKC, coupures de mots) puis **découpé en sections** (Expérience, Formation,
+  Compétences, Projets) par des expressions régulières sur les titres.
+
+### 3.4 Résultat : score et verdict
+
+![Résultats](docs/screenshots/04-resultats.jpg)
+
+**À l'écran :** une jauge d'**adéquation globale** (72,9/100), le **verdict** (« Fragile ») et quatre
+sous-scores : Technique, Expérience, Formation, Savoir-être.
+**Sous le capot :**
+
+```text
+score = 0.50 × technique + 0.25 × expérience + 0.15 × formation + 0.10 × savoir-être
+```
+
+- Les poids sont réglables dans les **Paramètres** ; si l'offre ne précise pas un critère, son poids est
+  redistribué sur les autres.
+- Le **verdict est volontairement plus sévère que le score**. Ici le score est de 72,9, mais Docker et AWS,
+  exigés, sont absents du CV. Or un recruteur ou un filtre ATS écarte un dossier sur un seul prérequis manquant,
+  d'où « Fragile ». C'est le cœur du projet : **un chiffre rassurant ne doit pas masquer un manque bloquant**.
+
+### 3.5 Matrice des compétences
+
+![Matrice](docs/screenshots/05-matrice.jpg)
+
+**À l'écran :** chaque exigence de l'offre, son statut (**Couvert / Partiel / Absent**), si elle est requise ou
+souhaitable, et **la phrase du CV qui le prouve**.
+**Sous le capot :** c'est le cœur NLP.
+1. **Extraction (spaCy `EntityRuler`)** : un dictionnaire bilingue de 85 compétences techniques et 16 savoir-être,
+   avec leurs synonymes (« apprentissage supervisé », « machine learning », « ML »…), repère les compétences dans
+   les deux textes. Le moteur ignore les négations (« sans expérience en Docker ») et détecte les exigences
+   facultatives (« FastAPI est un **atout** »), phrase par phrase.
+2. **Couverture outil → concept** : le CV cite *scikit-learn* et l'offre demande du *Machine Learning*.
+   L'outil prouve le concept, d'où **« Couvert via scikit-learn »**.
+3. **Similarité sémantique** : quand rien ne correspond exactement, le modèle **all-MiniLM-L6-v2** transforme
+   l'exigence et les phrases du CV en vecteurs de 384 dimensions. Une similarité cosinus ≥ 0,60 dans le même
+   domaine donne au mieux **Partiel**. *Une ressemblance de sens ne prouve jamais une maîtrise.*
+
+### 3.6 Preuves et méthode
+
+![Preuves et méthode](docs/screenshots/06-preuves-methode.jpg)
+
+**À l'écran :** le détail du calcul de chaque critère, les sections reconnues dans le CV et l'offre, le modèle
+utilisé et les avertissements (par exemple : aucun LLM configuré).
+**Sous le capot :** la **transparence** est une exigence de conception. L'application montre ses propres limites
+(« l'extraction utilise un dictionnaire : les compétences hors vocabulaire peuvent être omises ») au lieu de
+les cacher.
+
+### 3.7 Le regard du recruteur : la partie IA générative
+
+![Bilan critique](docs/screenshots/07-bilan-critique.jpg)
+
+**À l'écran :** un bilan critique hiérarchisé par gravité : **BLOQUANT** (prérequis absent), **MAJEUR**
+(expérience insuffisante), **MINEUR** (terme de l'offre absent du CV, qualités non illustrées,
+aucun résultat chiffré).
+**Sous le capot :** c'est l'objectif « IA générative textuelle » du projet, détaillé en [section 4](#4-où-est-lia--le-regard-de-lingénieur).
+Les règles produisent d'abord un bilan de référence, que le LLM (Llama 3.3 70B) peut ensuite **réécrire** sous
+contrôle.
+
+### 3.8 Plan de progression
+
+![Plan d'action](docs/screenshots/08-plan-action.jpg)
+
+**À l'écran :** une carte par compétence manquante, avec un mini-projet concret, un **objectif mesurable** et un
+lien vers la **ressource officielle** (documentation Docker, AWS…).
+**Sous le capot :** les actions ne portent **que** sur les compétences non couvertes, et les liens viennent du
+dictionnaire, **jamais du LLM**, ce qui écarte les URL inventées.
+
+### 3.9 Reformulations du CV
+
+![Reformulations](docs/screenshots/09-reformulations.jpg)
+
+**À l'écran :** à gauche **une phrase réelle du CV**, à droite une proposition qui reprend **le vocabulaire de
+l'offre**, avec le mot-clé visé et la justification. En bas, les exports : **rapport HTML/PDF, CSV, JSON**.
+**Sous le capot :** une reformulation est **rejetée par le code** si la phrase « originale » n'existe pas mot pour
+mot dans le CV, ou si la proposition **invente un chiffre**. Quand un résultat manque, l'outil écrit
+`[à préciser s'il est vérifiable]` au lieu de l'inventer.
+
+### 3.10 Bilans enregistrés
+
+![Historique](docs/screenshots/10-historique.jpg)
+
+**À l'écran :** les analyses que l'utilisateur a **choisi** d'enregistrer, à rouvrir ou supprimer.
+**Sous le capot :** table SQLite `analyses` (id UUID, titre, date UTC, score, résultat JSON), indexée par
+propriétaire et date. Rien n'est enregistré sans action explicite ; les fichiers originaux ne sont jamais conservés.
+
+### 3.11 L'architecture expliquée dans l'application
+
+| Système | Pipeline NLP | Données & API |
+|---|---|---|
+| ![Système](docs/screenshots/11-architecture-systeme.jpg) | ![Pipeline](docs/screenshots/12-architecture-pipeline.jpg) | ![Données](docs/screenshots/13-architecture-donnees.jpg) |
+
+Trois vues interactives, intégrées au produit, pour un jury ou un nouveau développeur :
+- **Système** : navigateur → FastAPI → moteur d'analyse → SQLite.
+- **Pipeline NLP** : Lire & nettoyer → Reconnaître → Comparer → Restituer.
+- **Données & API** : le cycle de vie d'un bilan enregistré.
+
+### 3.12 Méthode, paramètres et mobile
+
+| Méthode & confidentialité | Paramètres | Mobile |
+|---|---|---|
+| ![Méthode](docs/screenshots/14-methode.jpg) | ![Paramètres](docs/screenshots/15-parametres.jpg) | ![Mobile](docs/screenshots/16-mobile.jpg) |
+
+- **Méthode** : comment le score est calculé, les limites connues, et ce que deviennent les données.
+- **Paramètres** : pondérations prédéfinies (Équilibré, Technique, Expérience) ou personnalisées, activation
+  du LLM.
+- **Mobile** : l'interface est responsive.
+
+---
+
+## 4. Où est l'IA ? Le regard de l'ingénieur
+
+### Ce qu'on a fait, et ce qu'on n'a pas fait
+
+**Aucun modèle n'a été entraîné.** Talent Match est un **pipeline NLP appliqué** : il assemble des modèles
+pré-entraînés, des règles explicites et du *prompt engineering* sous contrôle.
+
+| Brique | Rôle | Type | Entraînée par nous ? |
+|---|---|---|---|
+| spaCy `EntityRuler` | Repérer les compétences | Symbolique (dictionnaire) | Non |
+| all-MiniLM-L6-v2 | Mesurer la proximité de sens | Transformer pré-entraîné (embeddings) | Non, utilisé tel quel |
+| Score composite | Agréger en une note sur 100 | Formule pondérée explicite | Non |
+| Llama 3.3 70B (Groq) | Rédiger le bilan critique | LLM génératif, piloté par prompt | Non |
+
+**Pourquoi ce choix ?** Il n'existe pas de jeu de données annoté « CV × offre → adéquation ». Sans données
+étiquetées, un modèle entraîné ne pourrait pas être évalué honnêtement. Une approche **explicable** permet de
+justifier chaque point du score devant un candidat, un recruteur ou un jury.
+
+### Génération contrôlée : « faire confiance, mais vérifier »
+
+```mermaid
+flowchart LR
+    R["Règles<br/>(verdict + critique<br/>de référence)"] --> P["Prompt système<br/>« juger sans complaisance,<br/>citer les preuves, JSON strict »"]
+    P --> L["LLM<br/>Llama 3.3 70B"]
+    L --> G{"Contrôles<br/>par code"}
+    G -->|conforme| OK["Bilan affiché<br/>source : LLM vérifié"]
+    G -->|rejeté ou LLM indisponible| FB["Bilan local<br/>(règles déterministes)"]
+```
+
+Le LLM reçoit les écarts calculés, les scores, le CV **sans l'en-tête de coordonnées** (protection des données
+personnelles) et l'offre. Sa réponse JSON est validée par un schéma **Pydantic**, puis contrôlée :
+
+| # | Contrôle | Risque évité |
+|---|---|---|
+| 1 | Le verdict du LLM ne peut **pas être plus favorable** que celui des règles (il peut être plus sévère) | Complaisance |
+| 2 | La phrase « originale » d'une reformulation doit exister **mot pour mot** dans le CV | Citation inventée |
+| 3 | Une reformulation ne peut pas introduire un **chiffre absent** de l'original | Résultats fabriqués |
+| 4 | Un prérequis **bloquant** détecté par les règles ne peut pas disparaître | Omission d'un manque |
+| 5 | Actions limitées aux compétences non couvertes ; liens issus du dictionnaire | URL et conseils hallucinés |
+
+Si aucune clé n'est configurée, ou si le LLM échoue, l'application affiche le **bilan critique local** (mêmes
+règles, formulation déterministe), avec un avertissement visible. Elle reste donc toujours utilisable.
+
+### Choix d'ingénierie notables
+
+- **MiniLM en ONNX Runtime au lieu de PyTorch** : mêmes poids officiels, mêmes vecteurs (écart mesuré de
+  1 × 10⁻⁷), mais environ 450 Mo de dépendances au lieu de plusieurs Go. C'est ce qui permet le même code en
+  local et sur Vercel.
+- **Fournisseur LLM interchangeable** : toute API compatible OpenAI (Groq, OpenRouter, Mistral) ou **Ollama**
+  en local, sans clé et sans que rien ne quitte la machine.
+- **Contrats typés de bout en bout** : Pydantic côté serveur et JSON documenté sur `/docs` (OpenAPI).
+
+---
+
+## 5. Ce qu'on a construit
+
+- **Backend FastAPI** : `POST /api/analyze` (JSON), `POST /api/analyze/files` (PDF/DOCX), comptes, historique,
+  documentation interactive sur `/docs`.
+- **Pipeline NLP** : lecture, nettoyage, segmentation, extraction par dictionnaire, négations, exigences
+  facultatives, années d'expérience, niveau d'études, couverture outil → concept, similarité sémantique.
+- **Score explicable** et **verdict de recruteur** plus strict que le score.
+- **Génération contrôlée** : critique hiérarchisée, reformulations vérifiées, plan de progression.
+- **Interface React 19** : 9 écrans, jauge animée, matrice filtrable, architecture interactive, exports
+  HTML/CSV/JSON, responsive.
+- **Sécurité** : bcrypt, JWT, isolation des données par utilisateur, limites de taille, aucune conservation
+  des fichiers.
+- **Client Streamlit** (exigence BNF1 du cahier des charges) qui consomme la même API.
+- **Déploiement** : configuration Vercel et compte de démonstration créé automatiquement.
+
+---
+
+## 6. Lancer en local
+
+**Prérequis :** [uv](https://docs.astral.sh/uv/getting-started/installation/) (installe Python 3.12),
+[Node.js 22.12+](https://nodejs.org/), Internet au premier lancement (modèle MiniLM d'environ 90 Mo).
+
+```bash
+git clone https://github.com/BAQLOULZINEB/congenial-memory.git talentmatch
+cd talentmatch
+uv sync
 uv run python run.py
 ```
 
-Ou exécuter `start.ps1` depuis PowerShell. Interface : http://127.0.0.1:8000.
-API et documentation interactive : http://127.0.0.1:8000/docs. Le port 8501 n'est plus utilisé.
-Le lanceur installe les dépendances JavaScript avec `npm ci`, compile React puis démarre FastAPI.
-L'interface et l'API partagent la même origine ; aucun serveur Vite n'est nécessaire pour cette utilisation.
-Le modèle MiniLM est téléchargé au premier lancement puis conservé dans le cache Hugging Face.
-Le lanceur attend le chargement avant d'ouvrir le navigateur. Ctrl+C arrête le service.
-Le port 8000 doit être libre. SQLite conserve uniquement les bilans explicitement enregistrés.
+`run.py` installe les dépendances React, compile l'interface, démarre FastAPI et ouvre
+**http://127.0.0.1:8000**. Connectez-vous avec le compte de démonstration ou créez un compte.
 
-Pour réutiliser un build existant sans réinstaller ou compiler :
+| Commande | Usage |
+|---|---|
+| `uv run python run.py --skip-build` | Relancer sans recompiler React |
+| `cd frontend-react && npm run dev` | Développement React à chaud (port 5173, backend démarré) |
+| `uv run --group ui streamlit run frontend/streamlit_app.py` | Client Streamlit (port 8501) |
 
-```powershell
-uv run python run.py --skip-build
-```
+**Activer le bilan généré par IA (gratuit) :** créez une clé sur
+[console.groq.com/keys](https://console.groq.com/keys), copiez `.env.example` en `.env`, renseignez
+`LLM_API_KEY=...`, puis relancez.
 
-Ajouter `--no-browser` pour ne pas ouvrir automatiquement un onglet.
+---
 
-## Développement React
+## 7. Déployer sur Vercel
 
-Dans un premier terminal à la racine :
+Le **même code** tourne en ligne :
 
-```powershell
-uv run uvicorn backend.main:app --host 127.0.0.1 --port 8000
-```
+- l'interface React compilée est servie par le CDN de Vercel ;
+- l'API FastAPI tourne comme fonction Python (`api/index.py`), routée par `vercel.json`.
 
-Dans un second terminal :
+1. Sur [vercel.com/new](https://vercel.com/new), importez ce dépôt et nommez le projet `talentmatch`.
+   Laissez **Framework Preset : Other**.
+2. Dans **Environment Variables**, ajoutez :
 
-```powershell
-cd frontend-react
-npm ci
-npm run dev
-```
+   | Variable | Valeur | Obligatoire |
+   |---|---|---|
+   | `JWT_SECRET` | 32+ caractères aléatoires : `python -c "import secrets;print(secrets.token_urlsafe(48))"` | Oui |
+   | `LLM_API_KEY` | Clé Groq | Non (sinon bilan local) |
 
-Vite sert alors l'interface sur http://127.0.0.1:5173 et relaie `/api` et `/health` vers FastAPI.
-Ne lancez pas `run.py` et la commande uvicorn en parallèle sur le même port.
-Pour une livraison compilée : `npm run build` dans `frontend-react`, puis `uv run python run.py --skip-build` à la racine.
+3. Cliquez sur **Deploy**. Le premier appel prend 10 à 30 s (démarrage à froid et téléchargement du modèle).
 
-## Utiliser
+**Base de données en ligne, en mode démonstration :** sur Vercel, seul `/tmp` est accessible en écriture. SQLite
+y est créée au démarrage avec le compte de démonstration et un bilan d'exemple. Inscription, connexion et
+sauvegarde fonctionnent, mais la base est **réinitialisée** quand Vercel recycle l'instance. C'est voulu pour une
+démo pédagogique, sans données personnelles durables. Pour une persistance réelle, il suffit de brancher une base
+hébergée (Turso, Neon…) dans `backend/storage.py`.
 
-1. Importer un CV PDF/DOCX ou coller son texte.
-2. Importer une offre PDF/DOCX ou coller sa description. Utiliser une seule source par document.
-3. Ajuster les quatre poids, dont la somme doit rester égale à 100 %.
-4. Lancer l'analyse, consulter les preuves et les compétences couvertes, partielles et absentes.
-5. Choisir **Enregistrer ce bilan** pour le conserver dans SQLite, puis le retrouver dans **Bilans enregistrés**.
-6. Exporter le bilan HTML imprimable, la matrice CSV ou le résultat JSON complet.
-   Ouvrir le HTML dans un navigateur puis **Imprimer → Enregistrer en PDF**.
+---
 
-Le mode démonstration fournit un exemple de CV et d'offre sans utiliser de données personnelles.
-Le backend ne conserve pas les fichiers utilisateur après leur traitement. Le mécanisme d'import de FastAPI
-peut utiliser des fichiers temporaires sur disque pour les téléversements volumineux ; ils sont fermés à la fin
-du traitement de la requête. Les résultats non enregistrés disparaissent au rechargement de la page.
-Les bilans enregistrés restent dans `data/talentmatch.sqlite3` jusqu'à leur suppression depuis l'historique.
-Ils contiennent les extraits des documents, mais pas les fichiers originaux. La base locale n'est pas chiffrée
-par l'application et est exclue de Git. `DATABASE_PATH` personnalise son emplacement.
-Les exports sont téléchargés explicitement par l'utilisateur.
-
-## Génération textuelle
-
-Sans configuration, le moteur produit des conseils structurés locaux. **Ce mode n'est pas un LLM**.
-Pour une génération conditionnée par un modèle de langage, installer un serveur local compatible
-avec l'API Chat Completions, par exemple Ollama, puis :
-
-```powershell
-ollama pull qwen2.5:3b
-Copy-Item .env.example .env
-```
-
-Ollama doit être actif. La configuration par défaut utilise `http://localhost:11434/v1`.
-Pour un autre serveur, régler `LLM_BASE_URL`, `LLM_MODEL` et, si nécessaire, `LLM_API_KEY`.
-Activer la case d'enrichissement dans l'interface. Seules les compétences et leurs extraits justificatifs
-sont envoyés ; ces extraits peuvent contenir des données personnelles. Un service distant reçoit ces données.
-La réponse est validée par Pydantic. Les liens restent issus du dictionnaire.
-En cas d'indisponibilité ou de JSON invalide, le mode local prend le relais avec un avertissement visible.
-La génération peut prendre jusqu'à 45 secondes, hors objectif de latence du calcul NLP.
-
-## Architecture
-
-Le [guide d'architecture](docs/architecture.md) explique les couches, le parcours d'une analyse,
-les échanges React/FastAPI, le calcul NLP et le traitement des données, avec des diagrammes.
+## 8. Structure du code
 
 ```text
-frontend-react/src/   React/JS : dashboard, formulaires, résultats, conseils et exports
-frontend-react/dist/ Build de production Vite (généré, ignoré par Git)
-frontend/reports.py   Exporteurs Python historiques conservés pour usages programmatiques
-backend/main.py       FastAPI : contrats JSON et multipart, readiness, service du build React
-backend/storage.py    SQLite : sauvegarde, liste, réouverture et suppression des bilans
-backend/parsing.py    Lecture PDF/DOCX et nettoyage
-backend/extraction.py spaCy EntityRuler, segmentation, durées et diplômes
-backend/taxonomy.py   Dictionnaire bilingue, relations dirigées et ressources
-backend/embeddings.py Sentence-Transformers / Hugging Face, modèle chargé une fois
-backend/analysis.py   Similarités, matrice d'écarts et score composite
-backend/recommendations.py  Conseils locaux + génération optionnelle
-backend/schemas.py    Structures Pydantic typées et validées
-tests/               Tests du pipeline, API, sécurité des exports et service du build React
+api/index.py                Point d'entrée Vercel (importe l'app FastAPI)
+backend/
+  main.py                   Routes, démarrage, compte de démonstration
+  parsing.py                Lecture PDF/DOCX, nettoyage, garde-fous
+  extraction.py             spaCy EntityRuler, sections, diplômes, négations
+  experience.py             Années d'expérience
+  taxonomy.py               Dictionnaire : compétences, synonymes, outil → concept, ressources
+  embeddings.py             MiniLM en ONNX Runtime
+  analysis.py               Matrice des écarts et score composite
+  recommendations.py        Verdict, critique, prompt LLM et contrôles de sa sortie
+  auth.py, auth_routes.py   bcrypt + JWT
+  storage.py                SQLite
+  schemas.py                Contrats Pydantic
+frontend-react/src/         Interface React 19 (Vite)
+frontend/streamlit_app.py   Client Streamlit
+tests/                      Tests pytest
+docs/                       Architecture, exigences, validation, captures d'écran
+vercel.json                 Build et routage Vercel
 ```
 
-Le frontend appelle uniquement l'API pour l'analyse. Aucun calcul NLP dans la couche de présentation.
-L'API expose `POST /api/analyze` (JSON), `POST /api/analyze/files` (multipart/form) et `GET /health`.
-Les champs JSON : `cv_text`, `job_text`, `weights` et `use_llm`.
-En multipart : mêmes champs (weights est une chaîne JSON), plus `cv_file` et `job_file` facultatifs.
+---
 
-## Calcul explicable
+## 9. Tests et limites
 
-Pondération par défaut : `0.50 × technique + 0.25 × expérience + 0.15 × formation + 0.10 × transversal`.
-
-- Alias canonique présent : **Couvert**, 100 points.
-- Relation dirigée connue (ex. PyTorch → Deep Learning), ou similarité cosinus ≥ 0,60 dans le même domaine :
-  **Partiel**, `50 × similarité` points. Pour une relation connue, le coefficient est au minimum 0,60.
-- Sinon : **Absent**, zéro point. Une parenté sémantique ne prouve jamais une maîtrise.
-- Une exigence souhaitable compte moitié moins qu'une exigence obligatoire.
-- Expérience : ratio des années déclarées, plafonné à 100 %. Pas de sommation des périodes ambiguës.
-- Formation : ratio du niveau académique reconnu, plafonné à 100 %. La spécialité doit être contrôlée manuellement.
-- Si l'offre ne précise pas un critère, son poids est redistribué entre les critères renseignés.
-  Si le CV n'apporte pas de preuve pour une exigence explicite, le critère vaut zéro avec avertissement.
-- Une offre sans compétence reconnue produit une erreur explicite plutôt qu'un score arbitraire.
-
-## Validation et limites
-
-```powershell
-uv run pytest -q
-uv run ruff check backend frontend tests run.py scripts
-cd frontend-react
-npm test
-npm run lint
-npm run build
+```bash
+uv run pytest -q             # 59 tests : pipeline, API, authentification, critique, déploiement
+uv run ruff check .
+cd frontend-react && npm test && npm run build   # 21 tests React
 ```
 
-Avec l'application en cours d'exécution, le parcours d'intégration HTTP peut être vérifié depuis la racine :
+Les tests utilisent des embeddings factices et n'appellent jamais un vrai LLM : ils sont rapides et reproductibles.
 
-```powershell
-uv run python scripts/smoke_react.py
-uv run python scripts/benchmark.py
-```
+**Limites assumées :**
+- Une compétence absente du dictionnaire (101 entrées) n'est pas détectée.
+- MiniLM est surtout anglophone ; les synonymes bilingues compensent en partie pour le français.
+- Les seuils (0,60, poids par défaut) sont des choix raisonnés, non calibrés sur un corpus annoté.
+- Les PDF scannés nécessitent un OCR préalable.
+- Le bilan LLM doit être relu : il ne doit jamais servir à inventer des acquis.
 
-Les tests unitaires injectent des embeddings déterministes : ils vérifient la logique sans télécharger de modèle.
-Le modèle réel est utilisé dans l'application ; le script `scripts/benchmark.py` mesure la latence après préchauffage.
-Les fichiers sont limités à 5 Mo, 30 pages PDF et 30 000 caractères. Les DOCX décompressés sont limités à 30 Mo.
-Les PDF scannés demandent un OCR externe, les PDF chiffrés sont refusés.
+---
 
-La reconnaissance d'entités repose sur des règles spaCy, et non sur un modèle NER entraîné sur un corpus de CV.
-Le dictionnaire est extensible mais non exhaustif. La négation simple est filtrée ; les négations complexes,
-les exigences alternatives et les formulations ambiguës nécessitent une relecture.
-MiniLM all-MiniLM-L6-v2 est principalement anglophone ; les alias bilingues facilitent le français,
-mais une évaluation sur corpus annoté français reste nécessaire. Les seuils ne sont pas calibrés scientifiquement.
-Les suggestions LLM doivent être relues et ne doivent jamais servir à inventer des acquis.
-Le prototype fournit des comptes locaux et un historique isolé par utilisateur. Il ne constitue pas un déploiement public sécurisé.
+<div align="center">
 
-La cible de 5 secondes concerne le pipeline à chaud, hors téléchargement du modèle et génération LLM.
-Les durées de chaque analyse sont affichées. Ce n'est pas une garantie sur tout matériel ou document.
+[FastAPI](https://fastapi.tiangolo.com/) · [spaCy](https://spacy.io/api/entityruler) ·
+[all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) ·
+[ONNX Runtime](https://onnxruntime.ai/) · [React](https://react.dev/) · [Groq](https://console.groq.com/) ·
+[Guide d'architecture](docs/architecture.md)
 
-## Références techniques
-
-- [FastAPI : fichiers et formulaires](https://fastapi.tiangolo.com/tutorial/request-forms-and-files/)
-- [spaCy : EntityRuler](https://spacy.io/api/entityruler)
-- [Sentence-Transformers : encode et normalisation](https://www.sbert.net/docs/package_reference/sentence_transformer/model.html)
-- [React : interface utilisateur](https://react.dev/learn)
-- [Vite : compilation et développement](https://vite.dev/guide/)
-
-## Comptes et réutilisation du projet de référence
-
-Les pages Connexion et Inscription, leurs champs accessibles (affichage du mot de passe, erreurs), le contexte React et le module bcrypt/JWT ont été copiés depuis `prediction-prix-immobilier`, puis adaptés. Voir `docs/auth-reuse.md`.
-
-Au premier lancement, créez votre propre compte sur `/inscription`. Les mots de passe sont hachés avec bcrypt. Les jetons expirent après 60 minutes. Les bilans sont filtrés par utilisateur sur le serveur. Les anciens bilans sans propriétaire restent conservés en base mais ne sont attribués automatiquement à aucun compte.
+</div>
